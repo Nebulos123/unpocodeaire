@@ -1,6 +1,3 @@
-// CONFIGURACIÓN DE SUPABASE
-// ============================================
-// REEMPLAZA ESTOS VALORES CON TUS CLAVES DE SUPABASE
 const SUPABASE_URL = 'https://uagwapbwmgvlpbgwyuvn.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVhZ3dhcGJ3bWd2bHBiZ3d5dXZuIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzMwOTc4MTUsImV4cCI6MjA4ODY3MzgxNX0.Fj8m1g_m02jhBSFAWYW-vdods53lN_acZ_0wOoG7TGo';
 
