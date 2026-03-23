@@ -360,59 +360,56 @@ async function deletePublication(id) {
 // ============================================
 async function loadSiteConfig() {
     if (!supabaseClient) return;
-    
     try {
-        console.log("🔄 Cargando configuracion desde Supabase...")
         const { data, error } = await supabaseClient
             .from('site_config')
             .select('*')
             .single();
-        
         if (error) throw error;
-
         if (data) {
-            siteConfig = { ...siteConfig, ...data };
-            console.log("✅ Configuracion cargada CORRECTAMENTE:", siteConfig)
+            // Mapeamos lo que viene de la BD (minúsculas) a nuestro objeto JS (camelCase)
+            siteConfig = {
+                name: data.name,
+                logo: data.logo,
+                heroImage: data.hero_image,
+                heroTitle: data.hero_title,
+                heroSubtitle: data.hero_subtitle,
+                footerText: data.footer_text
+            };
+            console.log("✅ Configuración cargada de Supabase");
         }
     } catch (error) {
-        console.error("❌ Error cargando configuracion, se usan datos locales:", error);
+        console.error("❌ Error cargando config:", error);
         loadLocalData();
     }
 }
 
 async function saveSiteConfig(config) {
     siteConfig = { ...siteConfig, ...config };
-    
     if (!supabaseClient) {
         saveLocalData();
         return siteConfig;
     }
-    
     try {
-        console.log("🔄 Enviando cambios a Supabase...");
-        
-        // Creamos el objeto con los nombres de las columnas exactos
         const dataToSave = {
             id: 1,
             name: siteConfig.name,
             logo: siteConfig.logo,
-            heroImage: siteConfig.heroImage,
-            heroTitle: siteConfig.heroTitle,
-            heroSubtitle: siteConfig.heroSubtitle,
-            footerText: siteConfig.footerText
+            hero_image: siteConfig.heroImage,
+            hero_title: siteConfig.heroTitle,
+            hero_subtitle: siteConfig.heroSubtitle,
+            footer_text: siteConfig.footerText
         };
-
         const { data, error } = await supabaseClient
             .from('site_config')
             .upsert(dataToSave)
             .select()
             .single();
-        
         if (error) throw error;
-        console.log("✅ Guardado CORRECTAMENTE en Supabase:", data);
+        console.log("✅ Guardado exitoso en Supabase");
         return data;
     } catch (error) {
-        console.error("❌ ERROR al guardar en Supabase:", error);
+        console.error("❌ ERROR al guardar:", error);
         showToast('Error al guardar: ' + error.message, 'error');
         saveLocalData();
         throw error;
