@@ -385,29 +385,39 @@ async function saveSiteConfig(config) {
     
     if (!supabaseClient) {
         saveLocalData();
-        console.log("✅ Guardado solo en localStorage (sin conexion)")
         return siteConfig;
     }
     
     try {
-        console.log("🔄 Enviando cambios de configuracion a Supabase...", siteConfig)
+        console.log("🔄 Enviando cambios a Supabase...");
+        
+        // Creamos el objeto con los nombres de las columnas exactos
+        const dataToSave = {
+            id: 1,
+            name: siteConfig.name,
+            logo: siteConfig.logo,
+            heroImage: siteConfig.heroImage,
+            heroTitle: siteConfig.heroTitle,
+            heroSubtitle: siteConfig.heroSubtitle,
+            footerText: siteConfig.footerText
+        };
+
         const { data, error } = await supabaseClient
             .from('site_config')
-            .upsert({ id: 1, ...siteConfig })
+            .upsert(dataToSave)
             .select()
             .single();
         
         if (error) throw error;
-        console.log("✅ Guardado CORRECTAMENTE en la base de datos", data)
+        console.log("✅ Guardado CORRECTAMENTE en Supabase:", data);
         return data;
     } catch (error) {
-        console.error("❌ ERROR al guardar en Supabase:", error)
+        console.error("❌ ERROR al guardar en Supabase:", error);
         showToast('Error al guardar: ' + error.message, 'error');
         saveLocalData();
         throw error;
     }
 }
-
 // ============================================
 // NEWSLETTER
 // ============================================
