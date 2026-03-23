@@ -133,32 +133,30 @@ const storage = {
 // INICIALIZACIÓN DE SUPABASE
 // ============================================
 async function initSupabase() {
-    if (SUPABASE_URL === 'https://uagwapbwmgvlpbgwyuvn.supabase.co' || SUPABASE_ANON_KEY === 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVhZ3dhcGJ3bWd2bHBiZ3d5dXZuIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzMwOTc4MTUsImV4cCI6MjA4ODY3MzgxNX0.Fj8m1g_m02jhBSFAWYW-vdods53lN_acZ_0wOoG7TGo') {
-        console.warn('Supabase no está configurado. Usando almacenamiento local.');
-        loadLocalData();
-        return false;
-    }
-    
+    // Hemos quitado la condición que comparaba tus llaves reales
     try {
         supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+        console.log("🚀 Intentando conectar a Supabase...");
         
         // Verificar sesión existente
         const { data: { session } } = await supabaseClient.auth.getSession();
         if (session) {
             currentUser = session.user;
             isAdmin = currentUser.email === ADMIN_EMAIL;
+            console.log("👤 Sesión recuperada:", currentUser.email);
         }
         
         // Escuchar cambios de autenticación
         supabaseClient.auth.onAuthStateChange((event, session) => {
             currentUser = session?.user || null;
             isAdmin = currentUser?.email === ADMIN_EMAIL;
+            console.log("🔐 Cambio de estado auth:", event);
             renderApp();
         });
         
         return true;
     } catch (error) {
-        console.error('Error inicializando Supabase:', error);
+        console.error('❌ Error inicializando Supabase:', error);
         loadLocalData();
         return false;
     }
