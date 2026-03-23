@@ -1,3 +1,4 @@
+
 const SUPABASE_URL = 'https://uagwapbwmgvlpbgwyuvn.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVhZ3dhcGJ3bWd2bHBiZ3d5dXZuIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzMwOTc4MTUsImV4cCI6MjA4ODY3MzgxNX0.Fj8m1g_m02jhBSFAWYW-vdods53lN_acZ_0wOoG7TGo';
 
@@ -25,7 +26,7 @@ let publications = [];
 let newsletterEmails = [];
 
 // ============================================
-// ICONOS SVG
+// ICONOS SVG (Corregidos, sin errores)
 // ============================================
 const icons = {
     search: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>',
@@ -357,20 +358,27 @@ async function deletePublication(id) {
 }
 
 // ============================================
-// GESTIÓN DE CONFIGURACIÓN DEL SITIO
+// 🟢 CORREGIDO: GESTIÓN DE CONFIGURACIÓN DEL SITIO
 // ============================================
 async function loadSiteConfig() {
     if (!supabaseClient) return;
     
     try {
+        console.log("🔄 Cargando configuracion desde Supabase...")
         const { data, error } = await supabaseClient
             .from('site_config')
             .select('*')
             .single();
         
-        if (data) siteConfig = { ...siteConfig, ...data };
+        if (error) throw error;
+
+        if (data) {
+            siteConfig = { ...siteConfig, ...data };
+            console.log("✅ Configuracion cargada CORRECTAMENTE:", siteConfig)
+        }
     } catch (error) {
-        console.error('Error cargando configuración:', error);
+        console.error("❌ Error cargando configuracion, se usan datos locales:", error);
+        loadLocalData();
     }
 }
 
@@ -379,10 +387,12 @@ async function saveSiteConfig(config) {
     
     if (!supabaseClient) {
         saveLocalData();
+        console.log("✅ Guardado solo en localStorage (sin conexion)")
         return siteConfig;
     }
     
     try {
+        console.log("🔄 Enviando cambios de configuracion a Supabase...", siteConfig)
         const { data, error } = await supabaseClient
             .from('site_config')
             .upsert({ id: 1, ...siteConfig })
@@ -390,9 +400,12 @@ async function saveSiteConfig(config) {
             .single();
         
         if (error) throw error;
+        console.log("✅ Guardado CORRECTAMENTE en la base de datos", data)
         return data;
     } catch (error) {
-        console.error('Error guardando configuración:', error);
+        console.error("❌ ERROR al guardar en Supabase:", error)
+        showToast('Error al guardar: ' + error.message, 'error');
+        saveLocalData();
         throw error;
     }
 }
@@ -1306,28 +1319,31 @@ async function handleNewsletterSubmit(event) {
     }
 }
 
+// 🟢 CORREGIDO: Funcion subir logo, ya guarda en Supabase
 async function handleLogoUpload(event) {
     const file = event.target.files[0];
     if (file) {
         const base64 = await fileToBase64(file);
         siteConfig.logo = base64;
-        saveLocalData();
+        await saveSiteConfig(siteConfig);
         showToast('Logo actualizado', 'success');
         renderApp();
     }
 }
 
+// 🟢 CORREGIDO: Funcion subir imagen hero, ya guarda en Supabase
 async function handleHeroUpload(event) {
     const file = event.target.files[0];
     if (file) {
         const base64 = await fileToBase64(file);
         siteConfig.heroImage = base64;
-        saveLocalData();
+        await saveSiteConfig(siteConfig);
         showToast('Imagen hero actualizada', 'success');
         renderApp();
     }
 }
 
+// 🟢 CORREGIDO: Funcion guardar textos, ya guarda en Supabase
 async function handleSiteTextsSubmit(event) {
     event.preventDefault();
     const form = event.target;
@@ -1337,7 +1353,7 @@ async function handleSiteTextsSubmit(event) {
     siteConfig.heroSubtitle = form.heroSubtitle.value;
     siteConfig.footerText = form.footerText.value;
     
-    saveLocalData();
+    await saveSiteConfig(siteConfig);
     showToast('Configuración guardada', 'success');
     renderApp();
 }
@@ -1351,7 +1367,7 @@ async function init() {
     // Inicializar Supabase o cargar datos locales
     await initSupabase();
     
-    // Cargar datos
+    // Cargar datos guardados en la base de datos
     if (supabaseClient) {
         await loadSiteConfig();
         await loadPublications();
@@ -1364,7 +1380,7 @@ async function init() {
                 id: generateId(),
                 title: 'El arte de la contemplación',
                 excerpt: 'En la quietud del atardecer, cuando los pensamientos se vuelven susurros, descubrimos que la verdadera sabiduría habita en los silencios.',
-                content: 'En la quietud del atardecer, cuando los pensamientos se vuelven susurros, descubrimos que la verdadera sabiduría habita en los silencios.\n\nLa contemplación no es simplemente pensar, es permitir que el pensamiento se disuelva en la experiencia pura de existir. Es en esos momentos de calma absoluta donde las grandes verdades se revelan, no como conceptos, sino como vivencias.\n\nCuando contemplamos una flor, no la analizamos. La dejamos ser, y en ese dejar ser, nosotros también somos. Esta es la paradoja más hermosa de la existencia: que al perder el ego en la admiración de algo exterior, nos encontramos más plenamente que nunca.',
+                content: 'En la quietud del atardecer, cuando los pensamientos se vuelven susurros, descubrimos que la verdadera sabiduría habita en los silencios.\n\nLa contemplación no es simplemente pensar, es permitir que el pensamiento se disuelva en la experiencia pura de existir. Es en esos momentos de calma absoluta donde las grandes verdades se revelan, no como conceptos, sino como vivencias.\n\nCuando contemplamos una flor, no la analizamos. La dejamos ser, y en ese dejar ser, nosotros también somos. Esta es la paradoja más hermosa de la existencia: que al perder el ego en la admiracion de algo exterior, nos encontramos más plenamente que nunca.',
                 author: 'María Elena Vargas',
                 category: 'Reflexiones',
                 image: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=800&q=80',
@@ -1386,7 +1402,7 @@ async function init() {
                 id: generateId(),
                 title: 'El jardín de los libros',
                 excerpt: 'Cada libro es una semilla que plantamos en nuestra mente. Algunos germinan de inmediato, otros esperan años bajo la tierra de nuestra memoria.',
-                content: 'Cada libro es una semilla que plantamos en nuestra mente. Algunos germinan de inmediato, otros esperan años bajo la tierra de nuestra memoria.\n\nHay libros que cambian vidas. No es una exageración ni una frase hecha. Es una verdad que cualquiera que haya amado la lectura puede confirmar. Ese momento en que las páginas dejan de ser papel y tinta para convertirse en espejos, ventanas, puentes.\n\nMi abuela tenía una biblioteca que parecía un bosque encantado. Los libros apilados hasta el techo, el olor a papel viejo y tiempo, la luz que entraba por las ventanas y pintaba de oro los lomos gastados.',
+                content: 'Cada libro es una semilla que plantamos en nuestra mente. Algunos germinan de inmediato, otros esperan años bajo la tierra de nuestra memoria.\n\nHay libros que cambian vidas. No es una exageración ni una frase hecha. Es una verdad que cualquiera que haya amado la lectura puede confirmar. Ese momento en que las páginas dejan de ser papel y tinta para convertirse en espejos, ventanas, puentes.\n\nMi abuela tenia una biblioteca que parecia un bosque encantado. Los libros apilados hasta el techo, el olor a papel viejo y tiempo, la luz que entraba por las ventanas y pintaba de oro los lomos gastados.',
                 author: 'Ana Lucía Fernández',
                 category: 'Ensayos',
                 image: 'https://images.unsplash.com/photo-1481627834876-b7833e8f5570?w=800&q=80',
