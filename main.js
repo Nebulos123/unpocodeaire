@@ -432,7 +432,14 @@ async function subscribeNewsletter(email) {
             .from('newsletter')
             .insert({ email });
         
-        if (error) throw error;
+        if (error) {
+            // Si el error es porque el email ya existe (código 23505 en Postgres)
+            if (error.code === '23505') {
+                showToast('Este correo ya está suscrito.', 'info');
+                return true; 
+            }
+            throw error;
+        }
         return true;
     } catch (error) {
         console.error('Error en newsletter:', error);
