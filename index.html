@@ -415,25 +415,55 @@
         }
         .publication-card:hover { transform: translateY(-6px); box-shadow: var(--shadow-hover); }
         
-        .publication-image { position: relative; aspect-ratio: 16/9; overflow: hidden; }
-        .publication-image img { width: 100%; height: 100%; object-fit: cover; transition: transform 0.6s ease; }
-        .publication-card:hover .publication-image img { transform: scale(1.08); }
+        .publication-image {
+            position: relative;
+            aspect-ratio: 16/9;
+            overflow: hidden;
+        }
         
-        .publication-image-overlay { position: absolute; inset: 0; background: linear-gradient(to top, rgba(95, 67, 50, 0.9), transparent); }
+        .publication-image img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            transition: transform 0.5s ease;
+        }
+        
         .publication-category {
-            position: absolute; top: 1rem; left: 1rem; padding: 0.35rem 0.85rem;
-            background-color: var(--color-sage); color: var(--color-cream);
-            font-size: 0.75rem; font-weight: 600; border-radius: 50px; text-transform: uppercase; letter-spacing: 0.05em;
+            position: absolute;
+            top: 1rem;
+            left: 1rem;
+            padding: 0.4rem 1rem;
+            background-color: var(--color-sage);
+            color: var(--color-cream);
+            font-size: 0.7rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            border-radius: 50px;
+            z-index: 10;
         }
+        
+        .publication-content {
+            padding: 1.5rem; /* Le damos aire al texto */
+        }
+        
         .publication-title {
-            position: absolute; bottom: 1rem; left: 1rem; right: 1rem;
-            font-family: var(--font-serif); font-size: 1.4rem; font-weight: 700;
-            color: var(--color-cream); line-height: 1.3;
+            /* Quitamos el absolute para que no se encime */
+            position: relative; 
+            font-family: var(--font-serif);
+            font-size: 1.6rem;
+            font-weight: 700;
+            color: var(--color-brown);
+            margin-bottom: 0.8rem;
+            line-height: 1.2; /* Para que no se vea raro si tiene dos renglones */
         }
         
-        .publication-content { padding: 1.5rem; flex-grow: 1; display: flex; flex-direction: column; }
-        .publication-excerpt { font-size: 0.95rem; color: rgba(95, 67, 50, 0.85); margin-bottom: 1.5rem; line-height: 1.6; flex-grow: 1; }
-        
+        .publication-excerpt {
+            font-size: 0.95rem;
+            color: rgba(95, 67, 50, 0.8);
+            line-height: 1.5;
+        }
+                
         .publication-meta { display: flex; align-items: center; justify-content: space-between; font-size: 0.8rem; color: var(--color-sage); border-top: 1px solid var(--color-beige); padding-top: 1rem; }
         .publication-author { display: flex; align-items: center; gap: 0.5rem; }
         .publication-author-avatar {
