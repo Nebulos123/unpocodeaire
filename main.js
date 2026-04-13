@@ -297,22 +297,23 @@ function openModal(content) {
     overlay.id = 'modal-overlay';
     overlay.innerHTML = `<div class="modal">${content}</div>`;
     
-    // Variables para rastrear dónde empieza el clic
+    // --- LÓGICA ANTI-CIERRE ACCIDENTAL ---
     let clickStartedOnOverlay = false;
 
     overlay.addEventListener('mousedown', (e) => {
-        // Guardamos si el clic empezó en el fondo oscuro
+        // Registramos si el usuario apretó el botón sobre el fondo oscuro
         clickStartedOnOverlay = (e.target === overlay);
     });
 
     overlay.addEventListener('mouseup', (e) => {
-        // Solo cerramos si el clic empezó Y terminó en el fondo oscuro
-        // Esto evita que se cierre al seleccionar texto dentro del modal
+        // Solo cerramos si empezó en el fondo Y terminó en el fondo.
+        // Si el usuario empezó adentro (seleccionando texto) y soltó afuera, NO se cierra.
         if (e.target === overlay && clickStartedOnOverlay) {
             closeModal();
         }
         clickStartedOnOverlay = false;
     });
+    // ---------------------------------------
     
     document.body.appendChild(overlay);
     currentModal = overlay;
