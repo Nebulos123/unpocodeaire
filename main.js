@@ -1,8 +1,7 @@
-
 const SUPABASE_URL = 'https://uagwapbwmgvlpbgwyuvn.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVhZ3dhcGJ3bWd2bHBiZ3d5dXZuIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzMwOTc4MTUsImV4cCI6MjA4ODY3MzgxNX0.Fj8m1g_m02jhBSFAWYW-vdods53lN_acZ_0wOoG7TGo';
 
-// Email del administrador (quien puede acceder al panel admin)
+// Email del administrador
 const ADMIN_EMAIL = 'macarenavila@admin.com';
 
 // ============================================
@@ -26,7 +25,7 @@ let publications = [];
 let newsletterEmails = [];
 
 // ============================================
-// ICONOS SVG (Corregidos, sin errores)
+// ICONOS SVG
 // ============================================
 const icons = {
     search: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>',
@@ -69,6 +68,7 @@ function $$(selector) {
 
 function showToast(message, type = 'info') {
     const container = $('#toast-container');
+    if (!container) return;
     const toast = document.createElement('div');
     toast.className = `toast ${type}`;
     toast.innerHTML = message;
@@ -81,6 +81,7 @@ function showToast(message, type = 'info') {
 
 function showLoading(show = true) {
     const overlay = $('#loading-overlay');
+    if (!overlay) return;
     if (show) {
         overlay.classList.remove('hidden');
     } else {
@@ -101,10 +102,12 @@ function generateId() {
 }
 
 function getInitials(name) {
+    if (!name) return '??';
     return name.split(' ').map(n => n[0]).join('').toUpperCase().substr(0, 2);
 }
 
 function escapeHtml(text) {
+    if (!text) return '';
     const div = document.createElement('div');
     div.textContent = text;
     return div.innerHTML;
@@ -133,10 +136,9 @@ const storage = {
 // INICIALIZACIÓN DE SUPABASE
 // ============================================
 async function initSupabase() {
-    // Hemos quitado la condición que comparaba tus llaves reales
     try {
         supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
-        console.log("🚀 Intentando conectar a Supabase...");
+        console.log("🚀 Conectando a Supabase...");
         
         // Verificar sesión existente
         const { data: { session } } = await supabaseClient.auth.getSession();
@@ -190,12 +192,7 @@ function saveLocalData() {
 // ============================================
 async function signUp(email, password, name) {
     if (!supabaseClient) {
-        // Modo local
-        const user = {
-            id: generateId(),
-            email: email,
-            user_metadata: { name: name }
-        };
+        const user = { id: generateId(), email, user_metadata: { name } };
         currentUser = user;
         isAdmin = email === ADMIN_EMAIL;
         storage.set('currentUser', currentUser);
@@ -206,16 +203,10 @@ async function signUp(email, password, name) {
     
     try {
         const { data, error } = await supabaseClient.auth.signUp({
-            email,
-            password,
-            options: {
-                data: { name }
-            }
+            email, password, options: { data: { name } }
         });
-        
         if (error) throw error;
-        
-        showToast('¡Revisa tu email para confirmar tu cuenta!', 'success');
+        showToast('¡Revisa tu email para confirmar!', 'success');
         return { success: true, data };
     } catch (error) {
         showToast('Error: ' + error.message, 'error');
@@ -225,12 +216,7 @@ async function signUp(email, password, name) {
 
 async function signIn(email, password) {
     if (!supabaseClient) {
-        // Modo local
-        const user = {
-            id: generateId(),
-            email: email,
-            user_metadata: { name: email.split('@')[0] }
-        };
+        const user = { id: generateId(), email, user_metadata: { name: email.split('@')[0] } };
         currentUser = user;
         isAdmin = email === ADMIN_EMAIL;
         storage.set('currentUser', currentUser);
@@ -240,13 +226,8 @@ async function signIn(email, password) {
     }
     
     try {
-        const { data, error } = await supabaseClient.auth.signInWithPassword({
-            email,
-            password
-        });
-        
+        const { data, error } = await supabaseClient.auth.signInWithPassword({ email, password });
         if (error) throw error;
-        
         currentUser = data.user;
         isAdmin = currentUser.email === ADMIN_EMAIL;
         showToast('¡Bienvenido!', 'success');
@@ -261,18 +242,15 @@ async function signIn(email, password) {
 
 async function signOut() {
     if (!supabaseClient) {
-        currentUser = null;
-        isAdmin = false;
+        currentUser = null; isAdmin = false;
         storage.remove('currentUser');
         showToast('Sesión cerrada', 'info');
         renderApp();
         return;
     }
-    
     try {
         await supabaseClient.auth.signOut();
-        currentUser = null;
-        isAdmin = false;
+        currentUser = null; isAdmin = false;
         showToast('Sesión cerrada', 'info');
         renderApp();
     } catch (error) {
@@ -285,7 +263,6 @@ async function signOut() {
 // ============================================
 async function loadPublications() {
     if (!supabaseClient) return;
-    
     try {
         const { data, error } = await supabaseClient
             .from('publications')
@@ -301,17 +278,24 @@ async function loadPublications() {
 
 async function savePublication(pub) {
     const isNew = !pub.id;
+    // Aseguramos que todos los campos estén presentes
     const publication = {
-        ...pub,
         id: pub.id || generateId(),
+        title: pub.title,
+        excerpt: pub.excerpt,
+        content: pub.content,
+        category: pub.category,
+        author: pub.author,
+        image: pub.image,
+        readTime: pub.readTime || '5 min', // Campo crítico
+        date: pub.date || formatDate(new Date()),
         created_at: pub.created_at || new Date().toISOString(),
         updated_at: new Date().toISOString()
     };
     
     if (!supabaseClient) {
-        if (isNew) {
-            publications.unshift(publication);
-        } else {
+        if (isNew) publications.unshift(publication);
+        else {
             const index = publications.findIndex(p => p.id === pub.id);
             if (index >= 0) publications[index] = publication;
         }
@@ -340,13 +324,8 @@ async function deletePublication(id) {
         saveLocalData();
         return true;
     }
-    
     try {
-        const { error } = await supabaseClient
-            .from('publications')
-            .delete()
-            .eq('id', id);
-        
+        const { error } = await supabaseClient.from('publications').delete().eq('id', id);
         if (error) throw error;
         return true;
     } catch (error) {
@@ -356,7 +335,7 @@ async function deletePublication(id) {
 }
 
 // ============================================
-// 🟢 CORREGIDO: GESTIÓN DE CONFIGURACIÓN DEL SITIO
+// GESTIÓN DE CONFIGURACIÓN DEL SITIO
 // ============================================
 async function loadSiteConfig() {
     if (!supabaseClient) return;
@@ -367,7 +346,7 @@ async function loadSiteConfig() {
             .single();
         if (error) throw error;
         if (data) {
-            // Mapeamos lo que viene de la BD (minúsculas) a nuestro objeto JS (camelCase)
+            // Mapeo de columnas snake_case a camelCase
             siteConfig = {
                 name: data.name,
                 logo: data.logo,
@@ -391,6 +370,7 @@ async function saveSiteConfig(config) {
         return siteConfig;
     }
     try {
+        // Mapeo inverso: camelCase a snake_case para la BD
         const dataToSave = {
             id: 1,
             name: siteConfig.name,
@@ -415,6 +395,7 @@ async function saveSiteConfig(config) {
         throw error;
     }
 }
+
 // ============================================
 // NEWSLETTER
 // ============================================
@@ -426,14 +407,9 @@ async function subscribeNewsletter(email) {
         }
         return true;
     }
-    
     try {
-        const { error } = await supabaseClient
-            .from('newsletter')
-            .insert({ email });
-        
+        const { error } = await supabaseClient.from('newsletter').insert({ email });
         if (error) {
-            // Si el error es porque el email ya existe (código 23505 en Postgres)
             if (error.code === '23505') {
                 showToast('Este correo ya está suscrito.', 'info');
                 return true; 
@@ -465,18 +441,14 @@ function fileToBase64(file) {
 let currentModal = null;
 
 function openModal(content) {
-    // Cerrar modal existente
     closeModal();
-    
     const overlay = document.createElement('div');
     overlay.className = 'modal-overlay open';
     overlay.id = 'modal-overlay';
     overlay.innerHTML = `<div class="modal">${content}</div>`;
-    
     overlay.addEventListener('click', (e) => {
         if (e.target === overlay) closeModal();
     });
-    
     document.body.appendChild(overlay);
     currentModal = overlay;
 }
@@ -488,158 +460,80 @@ function closeModal() {
     }
 }
 
-// Modal de Login
 function showLoginModal() {
     openModal(`
-        <div class="modal-header">
-            <h2>Iniciar sesión</h2>
-            <p>Accede a tu cuenta</p>
-        </div>
+        <div class="modal-header"><h2>Iniciar sesión</h2><p>Accede a tu cuenta</p></div>
         <form id="login-form" class="modal-body">
-            <div class="form-group">
-                <label class="form-label">Email</label>
-                <input type="email" class="form-input" name="email" placeholder="tu@email.com" required>
-            </div>
-            <div class="form-group">
-                <label class="form-label">Contraseña</label>
-                <input type="password" class="form-input" name="password" placeholder="••••••••" required minlength="6">
-            </div>
-            <button type="submit" class="btn btn-primary" style="width: 100%">
-                ${icon('login')} Entrar
-            </button>
+            <div class="form-group"><label class="form-label">Email</label><input type="email" class="form-input" name="email" placeholder="tu@email.com" required></div>
+            <div class="form-group"><label class="form-label">Contraseña</label><input type="password" class="form-input" name="password" placeholder="••••••••" required minlength="6"></div>
+            <button type="submit" class="btn btn-primary" style="width: 100%">${icon('login')} Entrar</button>
         </form>
-        <div class="modal-footer">
-            <p>¿No tienes cuenta? <button type="button" onclick="showRegisterModal()">Regístrate aquí</button></p>
-        </div>
+        <div class="modal-footer"><p>¿No tienes cuenta? <button type="button" onclick="showRegisterModal()">Regístrate aquí</button></p></div>
     `);
-    
     $('#login-form').addEventListener('submit', async (e) => {
         e.preventDefault();
         const form = e.target;
-        const email = form.email.value;
-        const password = form.password.value;
-        
         const btn = form.querySelector('button[type="submit"]');
-        btn.disabled = true;
-        btn.innerHTML = '<span class="spinner"></span> Entrando...';
-        
-        await signIn(email, password);
+        btn.disabled = true; btn.innerHTML = '<span class="spinner"></span> Entrando...';
+        await signIn(form.email.value, form.password.value);
     });
 }
 
-// Modal de Registro
 function showRegisterModal() {
     openModal(`
-        <div class="modal-header">
-            <h2>Crear cuenta</h2>
-            <p>Únete a nuestra comunidad</p>
-        </div>
+        <div class="modal-header"><h2>Crear cuenta</h2><p>Únete a nuestra comunidad</p></div>
         <form id="register-form" class="modal-body">
-            <div class="form-group">
-                <label class="form-label">Nombre</label>
-                <input type="text" class="form-input" name="name" placeholder="Tu nombre" required>
-            </div>
-            <div class="form-group">
-                <label class="form-label">Email</label>
-                <input type="email" class="form-input" name="email" placeholder="tu@email.com" required>
-            </div>
-            <div class="form-group">
-                <label class="form-label">Contraseña</label>
-                <input type="password" class="form-input" name="password" placeholder="••••••••" required minlength="6">
-            </div>
-            <div class="form-group">
-                <label class="form-label">Confirmar contraseña</label>
-                <input type="password" class="form-input" name="confirmPassword" placeholder="••••••••" required>
-            </div>
-            <button type="submit" class="btn btn-primary" style="width: 100%">
-                ${icon('user')} Crear cuenta
-            </button>
+            <div class="form-group"><label class="form-label">Nombre</label><input type="text" class="form-input" name="name" placeholder="Tu nombre" required></div>
+            <div class="form-group"><label class="form-label">Email</label><input type="email" class="form-input" name="email" placeholder="tu@email.com" required></div>
+            <div class="form-group"><label class="form-label">Contraseña</label><input type="password" class="form-input" name="password" placeholder="••••••••" required minlength="6"></div>
+            <div class="form-group"><label class="form-label">Confirmar contraseña</label><input type="password" class="form-input" name="confirmPassword" placeholder="••••••••" required></div>
+            <button type="submit" class="btn btn-primary" style="width: 100%">${icon('user')} Crear cuenta</button>
         </form>
-        <div class="modal-footer">
-            <p>¿Ya tienes cuenta? <button type="button" onclick="showLoginModal()">Inicia sesión</button></p>
-        </div>
+        <div class="modal-footer"><p>¿Ya tienes cuenta? <button type="button" onclick="showLoginModal()">Inicia sesión</button></p></div>
     `);
-    
     $('#register-form').addEventListener('submit', async (e) => {
         e.preventDefault();
         const form = e.target;
-        const name = form.name.value;
-        const email = form.email.value;
-        const password = form.password.value;
-        const confirmPassword = form.confirmPassword.value;
-        
-        if (password !== confirmPassword) {
-            showToast('Las contraseñas no coinciden', 'error');
-            return;
+        if (form.password.value !== form.confirmPassword.value) {
+            showToast('Las contraseñas no coinciden', 'error'); return;
         }
-        
         const btn = form.querySelector('button[type="submit"]');
-        btn.disabled = true;
-        btn.innerHTML = '<span class="spinner"></span> Creando...';
-        
-        await signUp(email, password, name);
+        btn.disabled = true; btn.innerHTML = '<span class="spinner"></span> Creando...';
+        await signUp(form.email.value, form.password.value, form.name.value);
     });
 }
 
-// Modal de Newsletter
 function showNewsletterModal() {
     openModal(`
-        <div class="modal-header">
-            <div class="modal-icon">${icon('mail', 'icon-lg')}</div>
-            <h2>Suscríbete al Newsletter</h2>
-            <p>Recibe las mejores publicaciones en tu correo</p>
-        </div>
+        <div class="modal-header"><div class="modal-icon">${icon('mail', 'icon-lg')}</div><h2>Suscríbete al Newsletter</h2><p>Recibe las mejores publicaciones en tu correo</p></div>
         <form id="newsletter-form" class="modal-body">
-            <div class="form-group">
-                <label class="form-label">Tu email</label>
-                <input type="email" class="form-input" name="email" placeholder="tu@email.com" required>
-            </div>
-            <button type="submit" class="btn btn-primary" style="width: 100%">
-                ${icon('mail')} Suscribirme
-            </button>
-            <p class="form-helper text-center mt-4">Respetamos tu privacidad. Puedes darte de baja en cualquier momento.</p>
+            <div class="form-group"><label class="form-label">Tu email</label><input type="email" class="form-input" name="email" placeholder="tu@email.com" required></div>
+            <button type="submit" class="btn btn-primary" style="width: 100%">${icon('mail')} Suscribirme</button>
+            <p class="form-helper text-center mt-4">Respetamos tu privacidad.</p>
         </form>
     `);
-    
     $('#newsletter-form').addEventListener('submit', async (e) => {
         e.preventDefault();
-        const email = e.target.email.value;
-        
         try {
-            await subscribeNewsletter(email);
+            await subscribeNewsletter(e.target.email.value);
             showToast('¡Gracias por suscribirte!', 'success');
             closeModal();
         } catch (error) {
-            showToast('Error al suscribir. Intenta de nuevo.', 'error');
+            showToast('Error al suscribir.', 'error');
         }
     });
 }
 
-// Modal de Publicación (Crear/Editar)
 function showPublicationModal(pub = null) {
     const isEdit = !!pub;
-    const defaultPub = {
-        title: '',
-        excerpt: '',
-        content: '',
-        category: 'Reflexiones',
-        author: '',
-        image: '',
-        readTime: '5 min'
-    };
+    const defaultPub = { title: '', excerpt: '', content: '', category: 'Reflexiones', author: '', image: '', readTime: '5 min' };
     const data = pub || defaultPub;
     
     openModal(`
-        <div class="modal-header">
-            <h2>${isEdit ? 'Editar' : 'Nueva'} Publicación</h2>
-        </div>
+        <div class="modal-header"><h2>${isEdit ? 'Editar' : 'Nueva'} Publicación</h2></div>
         <form id="publication-form" class="modal-body">
-            <div class="form-group">
-                <label class="form-label">Título</label>
-                <input type="text" class="form-input" name="title" value="${escapeHtml(data.title)}" required>
-            </div>
-            <div class="form-group">
-                <label class="form-label">Categoría</label>
+            <div class="form-group"><label class="form-label">Título</label><input type="text" class="form-input" name="title" value="${escapeHtml(data.title)}" required></div>
+            <div class="form-group"><label class="form-label">Categoría</label>
                 <select class="form-input" name="category" required>
                     <option value="Reflexiones" ${data.category === 'Reflexiones' ? 'selected' : ''}>Reflexiones</option>
                     <option value="Poesía" ${data.category === 'Poesía' ? 'selected' : ''}>Poesía</option>
@@ -647,47 +541,26 @@ function showPublicationModal(pub = null) {
                     <option value="Naturaleza" ${data.category === 'Naturaleza' ? 'selected' : ''}>Naturaleza</option>
                 </select>
             </div>
-            <div class="form-group">
-                <label class="form-label">Autor</label>
-                <input type="text" class="form-input" name="author" value="${escapeHtml(data.author)}" required>
-            </div>
-            <div class="form-group">
-                <label class="form-label">Tiempo de lectura</label>
-                <input type="text" class="form-input" name="readTime" value="${escapeHtml(data.readTime)}" placeholder="5 min">
-            </div>
-            <div class="form-group">
-                <label class="form-label">Extracto</label>
-                <textarea class="form-input" name="excerpt" rows="2" required>${escapeHtml(data.excerpt)}</textarea>
-            </div>
-            <div class="form-group">
-                <label class="form-label">Contenido</label>
-                <textarea class="form-input" name="content" rows="6" required>${escapeHtml(data.content)}</textarea>
-            </div>
-            <div class="form-group">
-                <label class="form-label">Imagen</label>
+            <div class="form-group"><label class="form-label">Autor</label><input type="text" class="form-input" name="author" value="${escapeHtml(data.author)}" required></div>
+            <div class="form-group"><label class="form-label">Tiempo de lectura</label><input type="text" class="form-input" name="readTime" value="${escapeHtml(data.readTime)}" placeholder="5 min"></div>
+            <div class="form-group"><label class="form-label">Extracto</label><textarea class="form-input" name="excerpt" rows="2" required>${escapeHtml(data.excerpt)}</textarea></div>
+            <div class="form-group"><label class="form-label">Contenido</label><textarea class="form-input" name="content" rows="6" required>${escapeHtml(data.content)}</textarea></div>
+            <div class="form-group"><label class="form-label">Imagen</label>
                 <div class="file-input-wrapper">
                     <input type="file" class="file-input" name="image" id="pub-image-input" accept="image/*">
-                    <label for="pub-image-input" class="file-input-label">
-                        ${icon('upload', 'icon-md')}
-                        <span>Click para subir imagen</span>
-                    </label>
-                    <div id="pub-image-preview" class="${data.image ? '' : 'hidden'}">
-                        <img src="${data.image}" class="file-preview" alt="Preview">
-                    </div>
+                    <label for="pub-image-input" class="file-input-label">${icon('upload', 'icon-md')}<span>Click para subir imagen</span></label>
+                    <div id="pub-image-preview" class="${data.image ? '' : 'hidden'}"><img src="${data.image}" class="file-preview" alt="Preview"></div>
                 </div>
             </div>
             <input type="hidden" name="id" value="${data.id || ''}">
             <input type="hidden" name="existingImage" value="${data.image || ''}">
             <div class="flex gap-3">
                 <button type="button" class="btn btn-secondary" style="flex: 1" onclick="closeModal()">Cancelar</button>
-                <button type="submit" class="btn btn-primary" style="flex: 1">
-                    ${icon('save')} ${isEdit ? 'Guardar' : 'Crear'}
-                </button>
+                <button type="submit" class="btn btn-primary" style="flex: 1">${icon('save')} ${isEdit ? 'Guardar' : 'Crear'}</button>
             </div>
         </form>
     `);
     
-    // Preview de imagen
     const imageInput = $('#pub-image-input');
     if (imageInput) {
         imageInput.addEventListener('change', async (e) => {
@@ -704,11 +577,8 @@ function showPublicationModal(pub = null) {
     $('#publication-form').addEventListener('submit', async (e) => {
         e.preventDefault();
         const form = e.target;
-        
         let imageData = form.existingImage.value;
-        if (form.image.files[0]) {
-            imageData = await fileToBase64(form.image.files[0]);
-        }
+        if (form.image.files[0]) imageData = await fileToBase64(form.image.files[0]);
         
         const publication = {
             id: form.id.value || null,
@@ -728,24 +598,18 @@ function showPublicationModal(pub = null) {
             closeModal();
             renderApp();
         } catch (error) {
-            showToast('Error al guardar', 'error');
+            showToast('Error al guardar: ' + error.message, 'error');
         }
     });
 }
 
-// Modal de confirmación de eliminación
 function showDeleteConfirmation(id) {
     openModal(`
-        <div class="modal-header">
-            <h2>Eliminar publicación</h2>
-            <p>¿Estás seguro? Esta acción no se puede deshacer.</p>
-        </div>
+        <div class="modal-header"><h2>Eliminar publicación</h2><p>¿Estás seguro?</p></div>
         <div class="modal-body">
             <div class="flex gap-3">
                 <button class="btn btn-secondary" style="flex: 1" onclick="closeModal()">Cancelar</button>
-                <button class="btn btn-error" style="flex: 1" onclick="confirmDelete('${id}')">
-                    ${icon('trash')} Eliminar
-                </button>
+                <button class="btn btn-error" style="flex: 1" onclick="confirmDelete('${id}')">${icon('trash')} Eliminar</button>
             </div>
         </div>
     `);
@@ -763,7 +627,7 @@ async function confirmDelete(id) {
 }
 
 // ============================================
-// VISTAS
+// VISTAS Y RENDERIZADO
 // ============================================
 let currentView = 'home';
 let selectedPublication = null;
@@ -771,7 +635,6 @@ let selectedCategory = 'Todos';
 let searchQuery = '';
 let adminTab = 'publications';
 
-// Renderizar Header
 function renderHeader() {
     return `
         <header class="header">
@@ -780,119 +643,67 @@ function renderHeader() {
                     <img src="${siteConfig.logo}" alt="Logo" class="logo-img">
                     <span class="logo-text">${siteConfig.name}</span>
                 </button>
-                
                 <div class="header-actions desktop">
                     <div class="search-wrapper">
                         <span class="search-icon">${icon('search')}</span>
-                        <input type="text" class="form-input search-input" placeholder="Buscar..." 
-                            value="${escapeHtml(searchQuery)}" onkeyup="handleSearch(event)">
+                        <input type="text" class="form-input search-input" placeholder="Buscar..." value="${escapeHtml(searchQuery)}" onkeyup="handleSearch(event)">
                     </div>
-                    
-                    <button class="btn btn-outline" onclick="showNewsletterModal()">
-                        ${icon('mail')} Newsletter
-                    </button>
-                    
+                    <button class="btn btn-outline" onclick="showNewsletterModal()">${icon('mail')} Newsletter</button>
                     ${currentUser ? `
                         <div class="user-menu">
                             <div class="user-avatar">${getInitials(currentUser.user_metadata?.name || currentUser.email)}</div>
                             <span class="text-sm">${currentUser.user_metadata?.name || currentUser.email.split('@')[0]}</span>
-                            ${isAdmin ? `
-                                <button class="btn btn-secondary btn-sm" onclick="navigateAdmin()">
-                                    ${icon('settings')} Admin
-                                </button>
-                            ` : ''}
-                            <button class="btn btn-ghost btn-sm" onclick="signOut()">
-                                ${icon('logout')} Salir
-                            </button>
+                            ${isAdmin ? `<button class="btn btn-secondary btn-sm" onclick="navigateAdmin()">${icon('settings')} Admin</button>` : ''}
+                            <button class="btn btn-ghost btn-sm" onclick="signOut()">${icon('logout')} Salir</button>
                         </div>
                     ` : `
-                        <button class="btn btn-ghost" onclick="showLoginModal()">
-                            ${icon('login')} Entrar
-                        </button>
-                        <button class="btn btn-primary" onclick="showRegisterModal()">
-                            ${icon('user')} Registrarse
-                        </button>
+                        <button class="btn btn-ghost" onclick="showLoginModal()">${icon('login')} Entrar</button>
+                        <button class="btn btn-primary" onclick="showRegisterModal()">${icon('user')} Registrarse</button>
                     `}
                 </div>
-                
-                <button class="btn btn-icon btn-ghost mobile-menu-btn" onclick="toggleMobileMenu()">
-                    ${icon('menu', 'icon-md')}
-                </button>
+                <button class="btn btn-icon btn-ghost mobile-menu-btn" onclick="toggleMobileMenu()">${icon('menu', 'icon-md')}</button>
             </div>
-            
             <div class="mobile-menu" id="mobile-menu">
-                <div class="form-group">
-                    <input type="text" class="form-input" placeholder="Buscar..." 
-                        value="${escapeHtml(searchQuery)}" onkeyup="handleSearch(event)">
-                </div>
-                <button class="btn btn-outline mb-3" onclick="showNewsletterModal()">
-                    ${icon('mail')} Newsletter
-                </button>
+                <div class="form-group"><input type="text" class="form-input" placeholder="Buscar..." value="${escapeHtml(searchQuery)}" onkeyup="handleSearch(event)"></div>
+                <button class="btn btn-outline mb-3" onclick="showNewsletterModal()">${icon('mail')} Newsletter</button>
                 ${currentUser ? `
                     <div class="user-menu">
-                        <div class="flex items-center gap-2 mb-3">
-                            <div class="user-avatar">${getInitials(currentUser.user_metadata?.name || currentUser.email)}</div>
-                            <span>${currentUser.user_metadata?.name || currentUser.email.split('@')[0]}</span>
-                        </div>
-                        ${isAdmin ? `
-                            <button class="btn btn-secondary mb-2" onclick="navigateAdmin()">
-                                ${icon('settings')} Panel Admin
-                            </button>
-                        ` : ''}
-                        <button class="btn btn-ghost" onclick="signOut()">
-                            ${icon('logout')} Cerrar sesión
-                        </button>
+                        <div class="flex items-center gap-2 mb-3"><div class="user-avatar">${getInitials(currentUser.user_metadata?.name || currentUser.email)}</div><span>${currentUser.user_metadata?.name || currentUser.email.split('@')[0]}</span></div>
+                        ${isAdmin ? `<button class="btn btn-secondary mb-2" onclick="navigateAdmin()">${icon('settings')} Panel Admin</button>` : ''}
+                        <button class="btn btn-ghost" onclick="signOut()">${icon('logout')} Cerrar sesión</button>
                     </div>
                 ` : `
-                    <div class="flex gap-2">
-                        <button class="btn btn-outline" onclick="showLoginModal()" style="flex: 1">Entrar</button>
-                        <button class="btn btn-primary" onclick="showRegisterModal()" style="flex: 1">Registrarse</button>
-                    </div>
+                    <div class="flex gap-2"><button class="btn btn-outline" onclick="showLoginModal()" style="flex: 1">Entrar</button><button class="btn btn-primary" onclick="showRegisterModal()" style="flex: 1">Registrarse</button></div>
                 `}
             </div>
         </header>
     `;
 }
 
-// Renderizar Hero
 function renderHero() {
     return `
         <section class="hero">
-            <div class="hero-bg">
-                ${siteConfig.heroImage ? `<img src="${siteConfig.heroImage}" alt="">` : ''}
-                <div class="hero-overlay"></div>
-            </div>
+            <div class="hero-bg">${siteConfig.heroImage ? `<img src="${siteConfig.heroImage}" alt="">` : ''}<div class="hero-overlay"></div></div>
             <div class="hero-content">
-                <div class="hero-logo">
-                    <img src="${siteConfig.logo}" alt="Logo">
-                </div>
+                <div class="hero-logo"><img src="${siteConfig.logo}" alt="Logo"></div>
                 <h1>${escapeHtml(siteConfig.heroTitle)}</h1>
                 <p>${escapeHtml(siteConfig.heroSubtitle)}</p>
                 <div class="hero-buttons">
-                    <button class="btn btn-lg" style="background: var(--color-cream); color: var(--color-brown);" onclick="showNewsletterModal()">
-                        ${icon('mail')} Suscríbete al Newsletter
-                    </button>
-                    <button class="btn btn-lg btn-outline" style="border-color: var(--color-cream); color: var(--color-cream);" onclick="scrollToPublications()">
-                        Explorar publicaciones
-                    </button>
+                    <button class="btn btn-lg" style="background: var(--color-cream); color: var(--color-brown);" onclick="showNewsletterModal()">${icon('mail')} Suscríbete al Newsletter</button>
+                    <button class="btn btn-lg btn-outline" style="border-color: var(--color-cream); color: var(--color-cream);" onclick="scrollToPublications()">Explorar publicaciones</button>
                 </div>
             </div>
-            <div class="hero-wave">
-                <svg viewBox="0 0 1440 120" fill="none" xmlns="http://www.w3.org/2000/svg">
-                    <path d="M0 120L60 110C120 100 240 80 360 70C480 60 600 60 720 65C840 70 960 80 1080 85C1200 90 1320 90 1380 90L1440 90V120H1380C1320 120 1200 120 1080 120C960 120 840 120 720 120C600 120 480 120 360 120C240 120 120 120 60 120H0Z" fill="#fefdfd"/>
-                </svg>
-            </div>
+            <div class="hero-wave"><svg viewBox="0 0 1440 120" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M0 120L60 110C120 100 240 80 360 70C480 60 600 60 720 65C840 70 960 80 1080 85C1200 90 1320 90 1380 90L1440 90V120H1380C1320 120 1200 120 1080 120C960 120 840 120 720 120C600 120 480 120 360 120C240 120 120 120 60 120H0Z" fill="#fefdfd"/></svg></div>
         </section>
     `;
 }
 
-// Renderizar Newsletter Section
 function renderNewsletterSection() {
     return `
         <section class="newsletter-section">
             ${icon('mail', 'icon-lg')}
             <h2>¿Te gusta lo que lees?</h2>
-            <p>Suscríbete a nuestro newsletter semanal y recibe las mejores reflexiones, poemas y ensayos directamente en tu correo.</p>
+            <p>Suscríbete a nuestro newsletter semanal.</p>
             <form class="newsletter-form" onsubmit="handleNewsletterSubmit(event)">
                 <input type="email" class="form-input" placeholder="tu@email.com" required>
                 <button type="submit" class="btn btn-primary">Suscribirse</button>
@@ -901,29 +712,20 @@ function renderNewsletterSection() {
     `;
 }
 
-// Renderizar Publicaciones
 function renderPublications() {
     const filtered = publications.filter(pub => {
         const matchesCategory = selectedCategory === 'Todos' || pub.category === selectedCategory;
-        const matchesSearch = pub.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                             pub.excerpt.toLowerCase().includes(searchQuery.toLowerCase());
+        const matchesSearch = pub.title.toLowerCase().includes(searchQuery.toLowerCase()) || pub.excerpt.toLowerCase().includes(searchQuery.toLowerCase());
         return matchesCategory && matchesSearch;
     });
-    
     const categories = ['Todos', 'Reflexiones', 'Poesía', 'Ensayos', 'Naturaleza'];
     
     return `
         <section class="publications-section" id="publications">
             <h2>Publicaciones recientes</h2>
-            
             <div class="category-filters">
-                ${categories.map(cat => `
-                    <button class="category-btn ${selectedCategory === cat ? 'active' : ''}" onclick="filterCategory('${cat}')">
-                        ${cat}
-                    </button>
-                `).join('')}
+                ${categories.map(cat => `<button class="category-btn ${selectedCategory === cat ? 'active' : ''}" onclick="filterCategory('${cat}')">${cat}</button>`).join('')}
             </div>
-            
             ${filtered.length > 0 ? `
                 <div class="publications-grid">
                     ${filtered.map(pub => `
@@ -937,107 +739,60 @@ function renderPublications() {
                             <div class="publication-content">
                                 <p class="publication-excerpt">${escapeHtml(pub.excerpt)}</p>
                                 <div class="publication-meta">
-                                    <div class="publication-author">
-                                        <div class="publication-author-avatar">${getInitials(pub.author)}</div>
-                                        <span>${escapeHtml(pub.author)}</span>
-                                    </div>
-                                    <div class="publication-info">
-                                        <span>${icon('calendar', 'icon-sm')} ${pub.date}</span>
-                                        <span>${icon('clock', 'icon-sm')} ${pub.readTime}</span>
-                                    </div>
+                                    <div class="publication-author"><div class="publication-author-avatar">${getInitials(pub.author)}</div><span>${escapeHtml(pub.author)}</span></div>
+                                    <div class="publication-info"><span>${icon('calendar', 'icon-sm')} ${pub.date}</span><span>${icon('clock', 'icon-sm')} ${pub.readTime}</span></div>
                                 </div>
                             </div>
                         </article>
                     `).join('')}
                 </div>
-            ` : `
-                <div class="empty-state">
-                    <p>No se encontraron publicaciones.</p>
-                </div>
-            `}
+            ` : `<div class="empty-state"><p>No se encontraron publicaciones.</p></div>`}
         </section>
     `;
 }
 
-// Renderizar detalle de publicación
 function renderPublicationDetail(pub) {
     if (!pub) return '';
-    
     const paragraphs = pub.content.split('\n\n').filter(p => p.trim());
-    
     return `
         <div class="publication-detail">
             <div class="publication-detail-header">
                 <img src="${pub.image || 'https://images.unsplash.com/photo-1481627834876-b7833e8f5570?w=800&q=80'}" alt="${escapeHtml(pub.title)}">
                 <div class="publication-detail-overlay"></div>
                 <div class="publication-detail-info">
-                    <button class="btn btn-ghost" style="color: var(--color-cream); margin-bottom: 1rem;" onclick="navigateHome()">
-                        ${icon('arrowLeft')} Volver
-                    </button>
+                    <button class="btn btn-ghost" style="color: var(--color-cream); margin-bottom: 1rem;" onclick="navigateHome()">${icon('arrowLeft')} Volver</button>
                     <span class="publication-category" style="position: static; margin-bottom: 0.5rem;">${pub.category}</span>
-                    <h1 style="font-family: var(--font-serif); font-size: 2rem; color: var(--color-cream); margin-bottom: 0.5rem;">
-                        ${escapeHtml(pub.title)}
-                    </h1>
+                    <h1 style="font-family: var(--font-serif); font-size: 2rem; color: var(--color-cream); margin-bottom: 0.5rem;">${escapeHtml(pub.title)}</h1>
                     <div class="flex items-center gap-4" style="color: rgba(254, 253, 253, 0.8); font-size: 0.875rem;">
-                        <div class="flex items-center gap-2">
-                            <div class="user-avatar">${getInitials(pub.author)}</div>
-                            <span>${escapeHtml(pub.author)}</span>
-                        </div>
+                        <div class="flex items-center gap-2"><div class="user-avatar">${getInitials(pub.author)}</div><span>${escapeHtml(pub.author)}</span></div>
                         <span>${icon('calendar', 'icon-sm')} ${pub.date}</span>
                         <span>${icon('clock', 'icon-sm')} ${pub.readTime}</span>
                     </div>
                 </div>
             </div>
-            
             <div class="publication-detail-content">
                 ${paragraphs.map(p => `<p>${escapeHtml(p)}</p>`).join('')}
-                
                 <div class="publication-actions">
                     <button class="btn btn-outline">${icon('heart')} Me gusta</button>
                     <button class="btn btn-outline">${icon('bookmark')} Guardar</button>
                     <button class="btn btn-outline">${icon('share')} Compartir</button>
                 </div>
-                
                 <div class="author-card">
                     <div class="author-card-avatar">${getInitials(pub.author)}</div>
-                    <div>
-                        <h3>${escapeHtml(pub.author)}</h3>
-                        <p>Escritor y colaborador de ${siteConfig.name}</p>
-                    </div>
+                    <div><h3>${escapeHtml(pub.author)}</h3><p>Escritor y colaborador de ${siteConfig.name}</p></div>
                 </div>
             </div>
         </div>
     `;
 }
 
-// Renderizar Footer
 function renderFooter() {
     return `
         <footer class="footer">
             <div class="footer-grid">
-                <div>
-                    <div class="footer-brand">
-                        <img src="${siteConfig.logo}" alt="Logo">
-                        <span>${siteConfig.name}</span>
-                    </div>
-                    <p>${siteConfig.footerText}</p>
-                </div>
-                <div>
-                    <h4>Explorar</h4>
-                    <ul>
-                        <li><button onclick="filterCategory('Reflexiones'); navigateHome();">Reflexiones</button></li>
-                        <li><button onclick="filterCategory('Poesía'); navigateHome();">Poesía</button></li>
-                        <li><button onclick="filterCategory('Ensayos'); navigateHome();">Ensayos</button></li>
-                        <li><button onclick="filterCategory('Naturaleza'); navigateHome();">Naturaleza</button></li>
-                    </ul>
-                </div>
-                <div>
-                    <h4>Newsletter</h4>
-                    <p>No te pierdas ninguna publicación.</p>
-                    <button class="btn btn-outline" style="border-color: var(--color-cream); color: var(--color-cream); margin-top: 0.5rem;" onclick="showNewsletterModal()">
-                        Suscribirse
-                    </button>
-                </div>
+                <div><div class="footer-brand"><img src="${siteConfig.logo}" alt="Logo"><span>${siteConfig.name}</span></div><p>${siteConfig.footerText}</p></div>
+                <div><h4>Explorar</h4><ul><li><button onclick="filterCategory('Reflexiones'); navigateHome();">Reflexiones</button></li><li><button onclick="filterCategory('Poesía'); navigateHome();">Poesía</button></li><li><button onclick="filterCategory('Ensayos'); navigateHome();">Ensayos</button></li><li><button onclick="filterCategory('Naturaleza'); navigateHome();">Naturaleza</button></li></ul></div>
+                <div><h4>Newsletter</h4><p>No te pierdas ninguna publicación.</p><button class="btn btn-outline" style="border-color: var(--color-cream); color: var(--color-cream); margin-top: 0.5rem;" onclick="showNewsletterModal()">Suscribirse</button></div>
             </div>
             <hr class="footer-divider">
             <p class="footer-copyright">© ${new Date().getFullYear()} ${siteConfig.name}. Todos los derechos reservados.</p>
@@ -1045,33 +800,15 @@ function renderFooter() {
     `;
 }
 
-// ============================================
-// PANEL DE ADMINISTRACIÓN
-// ============================================
 function renderAdminPanel() {
     return `
         <div class="admin-panel">
-            <div class="admin-header">
-                <div class="admin-header-inner">
-                    <h1>${icon('settings')} Panel de Administración</h1>
-                    <button class="btn btn-secondary" onclick="navigateHome()">
-                        ${icon('arrowLeft')} Volver al sitio
-                    </button>
-                </div>
-            </div>
-            
+            <div class="admin-header"><div class="admin-header-inner"><h1>${icon('settings')} Panel de Administración</h1><button class="btn btn-secondary" onclick="navigateHome()">${icon('arrowLeft')} Volver al sitio</button></div></div>
             <nav class="admin-nav">
-                <button class="admin-nav-btn ${adminTab === 'publications' ? 'active' : ''}" onclick="setAdminTab('publications')">
-                    Publicaciones
-                </button>
-                <button class="admin-nav-btn ${adminTab === 'site' ? 'active' : ''}" onclick="setAdminTab('site')">
-                    Configuración del Sitio
-                </button>
-                <button class="admin-nav-btn ${adminTab === 'newsletter' ? 'active' : ''}" onclick="setAdminTab('newsletter')">
-                    Newsletter
-                </button>
+                <button class="admin-nav-btn ${adminTab === 'publications' ? 'active' : ''}" onclick="setAdminTab('publications')">Publicaciones</button>
+                <button class="admin-nav-btn ${adminTab === 'site' ? 'active' : ''}" onclick="setAdminTab('site')">Configuración del Sitio</button>
+                <button class="admin-nav-btn ${adminTab === 'newsletter' ? 'active' : ''}" onclick="setAdminTab('newsletter')">Newsletter</button>
             </nav>
-            
             <div class="admin-content">
                 ${adminTab === 'publications' ? renderAdminPublications() : ''}
                 ${adminTab === 'site' ? renderAdminSite() : ''}
@@ -1084,26 +821,11 @@ function renderAdminPanel() {
 function renderAdminPublications() {
     return `
         <div class="admin-card">
-            <div class="flex justify-between items-center mb-4">
-                <h3>Publicaciones (${publications.length})</h3>
-                <button class="btn btn-primary" onclick="showPublicationModal()">
-                    ${icon('plus')} Nueva publicación
-                </button>
-            </div>
-            
+            <div class="flex justify-between items-center mb-4"><h3>Publicaciones (${publications.length})</h3><button class="btn btn-primary" onclick="showPublicationModal()">${icon('plus')} Nueva publicación</button></div>
             ${publications.length > 0 ? `
                 <div style="overflow-x: auto;">
                     <table class="admin-table">
-                        <thead>
-                            <tr>
-                                <th>Imagen</th>
-                                <th>Título</th>
-                                <th>Categoría</th>
-                                <th>Autor</th>
-                                <th>Fecha</th>
-                                <th>Acciones</th>
-                            </tr>
-                        </thead>
+                        <thead><tr><th>Imagen</th><th>Título</th><th>Categoría</th><th>Autor</th><th>Fecha</th><th>Acciones</th></tr></thead>
                         <tbody>
                             ${publications.map(pub => `
                                 <tr>
@@ -1112,226 +834,64 @@ function renderAdminPublications() {
                                     <td>${pub.category}</td>
                                     <td>${escapeHtml(pub.author)}</td>
                                     <td>${pub.date}</td>
-                                    <td>
-                                        <div class="admin-table-actions">
-                                            <button class="btn btn-outline btn-sm" onclick="showPublicationModal(publications.find(p => p.id === '${pub.id}'))">
-                                                ${icon('edit')}
-                                            </button>
-                                            <button class="btn btn-error btn-sm" onclick="showDeleteConfirmation('${pub.id}')">
-                                                ${icon('trash')}
-                                            </button>
-                                        </div>
-                                    </td>
+                                    <td><div class="admin-table-actions"><button class="btn btn-outline btn-sm" onclick="showPublicationModal(publications.find(p => p.id === '${pub.id}'))">${icon('edit')}</button><button class="btn btn-error btn-sm" onclick="showDeleteConfirmation('${pub.id}')">${icon('trash')}</button></div></td>
                                 </tr>
                             `).join('')}
                         </tbody>
                     </table>
                 </div>
-            ` : `
-                <div class="empty-state">
-                    <p>No hay publicaciones. ¡Crea la primera!</p>
-                </div>
-            `}
+            ` : `<div class="empty-state"><p>No hay publicaciones. ¡Crea la primera!</p></div>`}
         </div>
     `;
 }
 
 function renderAdminSite() {
     return `
-        <div class="admin-card">
-            <h3>Logo del sitio</h3>
-            <div class="logo-upload-section">
-                <img src="${siteConfig.logo}" alt="Logo actual" class="current-logo">
-                <div class="logo-upload-info">
-                    <h4>Logo actual</h4>
-                    <p>Recomendado: imagen cuadrada de al menos 200x200px</p>
-                    <div class="file-input-wrapper">
-                        <input type="file" class="file-input" id="logo-input" accept="image/*" onchange="handleLogoUpload(event)">
-                        <label for="logo-input" class="btn btn-primary">
-                            ${icon('upload')} Subir nuevo logo
-                        </label>
-                    </div>
-                </div>
-            </div>
-        </div>
-        
-        <div class="admin-card">
-            <h3>Imagen Hero</h3>
-            ${siteConfig.heroImage ? `
-                <img src="${siteConfig.heroImage}" alt="Hero actual" class="hero-preview">
-            ` : ''}
-            <div class="file-input-wrapper">
-                <input type="file" class="file-input" id="hero-input" accept="image/*" onchange="handleHeroUpload(event)">
-                <label for="hero-input" class="file-input-label">
-                    ${icon('image', 'icon-md')}
-                    <span>Click para subir imagen hero</span>
-                </label>
-            </div>
-        </div>
-        
-        <div class="admin-card">
-            <h3>Textos del sitio</h3>
-            <form onsubmit="handleSiteTextsSubmit(event)">
-                <div class="form-group">
-                    <label class="form-label">Nombre del sitio</label>
-                    <input type="text" class="form-input" name="name" value="${escapeHtml(siteConfig.name)}">
-                </div>
-                <div class="form-group">
-                    <label class="form-label">Título hero</label>
-                    <input type="text" class="form-input" name="heroTitle" value="${escapeHtml(siteConfig.heroTitle)}">
-                </div>
-                <div class="form-group">
-                    <label class="form-label">Subtítulo hero</label>
-                    <textarea class="form-input" name="heroSubtitle" rows="2">${escapeHtml(siteConfig.heroSubtitle)}</textarea>
-                </div>
-                <div class="form-group">
-                    <label class="form-label">Texto del footer</label>
-                    <textarea class="form-input" name="footerText" rows="2">${escapeHtml(siteConfig.footerText)}</textarea>
-                </div>
-                <button type="submit" class="btn btn-primary">
-                    ${icon('save')} Guardar cambios
-                </button>
-            </form>
-        </div>
+        <div class="admin-card"><h3>Logo del sitio</h3><div class="logo-upload-section"><img src="${siteConfig.logo}" alt="Logo actual" class="current-logo"><div class="logo-upload-info"><h4>Logo actual</h4><p>Recomendado: imagen cuadrada de al menos 200x200px</p><div class="file-input-wrapper"><input type="file" class="file-input" id="logo-input" accept="image/*" onchange="handleLogoUpload(event)"><label for="logo-input" class="btn btn-primary">${icon('upload')} Subir nuevo logo</label></div></div></div></div>
+        <div class="admin-card"><h3>Imagen Hero</h3>${siteConfig.heroImage ? `<img src="${siteConfig.heroImage}" alt="Hero actual" class="hero-preview">` : ''}<div class="file-input-wrapper"><input type="file" class="file-input" id="hero-input" accept="image/*" onchange="handleHeroUpload(event)"><label for="hero-input" class="file-input-label">${icon('image', 'icon-md')}<span>Click para subir imagen hero</span></label></div></div>
+        <div class="admin-card"><h3>Textos del sitio</h3><form onsubmit="handleSiteTextsSubmit(event)"><div class="form-group"><label class="form-label">Nombre del sitio</label><input type="text" class="form-input" name="name" value="${escapeHtml(siteConfig.name)}"></div><div class="form-group"><label class="form-label">Título hero</label><input type="text" class="form-input" name="heroTitle" value="${escapeHtml(siteConfig.heroTitle)}"></div><div class="form-group"><label class="form-label">Subtítulo hero</label><textarea class="form-input" name="heroSubtitle" rows="2">${escapeHtml(siteConfig.heroSubtitle)}</textarea></div><div class="form-group"><label class="form-label">Texto del footer</label><textarea class="form-input" name="footerText" rows="2">${escapeHtml(siteConfig.footerText)}</textarea></div><button type="submit" class="btn btn-primary">${icon('save')} Guardar cambios</button></form></div>
     `;
 }
 
 function renderAdminNewsletter() {
     return `
-        <div class="admin-card">
-            <h3>Suscriptores del Newsletter (${newsletterEmails.length})</h3>
-            
-            <div class="stats-grid mb-6">
-                <div class="stat-card">
-                    <div class="stat-value">${newsletterEmails.length}</div>
-                    <div class="stat-label">Total suscriptores</div>
-                </div>
-            </div>
-            
-            ${newsletterEmails.length > 0 ? `
-                <div style="overflow-x: auto;">
-                    <table class="admin-table">
-                        <thead>
-                            <tr>
-                                <th>Email</th>
-                                <th>Fecha</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            ${newsletterEmails.map(email => `
-                                <tr>
-                                    <td>${escapeHtml(email)}</td>
-                                    <td>-</td>
-                                </tr>
-                            `).join('')}
-                        </tbody>
-                    </table>
-                </div>
-            ` : `
-                <div class="empty-state">
-                    <p>No hay suscriptores aún.</p>
-                </div>
-            `}
-        </div>
+        <div class="admin-card"><h3>Suscriptores del Newsletter (${newsletterEmails.length})</h3><div class="stats-grid mb-6"><div class="stat-card"><div class="stat-value">${newsletterEmails.length}</div><div class="stat-label">Total suscriptores</div></div></div>${newsletterEmails.length > 0 ? `
+            <div style="overflow-x: auto;"><table class="admin-table"><thead><tr><th>Email</th><th>Fecha</th></tr></thead><tbody>${newsletterEmails.map(email => `<tr><td>${escapeHtml(email)}</td><td>-</td></tr>`).join('')}</tbody></table></div>
+        ` : `<div class="empty-state"><p>No hay suscriptores aún.</p></div>`}</div>
     `;
 }
 
-// ============================================
-// FUNCIONES DE NAVEGACIÓN Y EVENTOS
-// ============================================
 function renderApp() {
     const app = $('#app');
+    if (!app) return;
     
     if (currentView === 'admin' && isAdmin) {
         app.innerHTML = renderAdminPanel();
     } else if (currentView === 'publication' && selectedPublication) {
-        app.innerHTML = `
-            ${renderHeader()}
-            <main class="flex-1">
-                ${renderPublicationDetail(selectedPublication)}
-            </main>
-        `;
+        app.innerHTML = `${renderHeader()}<main class="flex-1">${renderPublicationDetail(selectedPublication)}</main>`;
     } else {
-        app.innerHTML = `
-            ${renderHeader()}
-            <main class="flex-1">
-                ${renderHero()}
-                ${renderNewsletterSection()}
-                ${renderPublications()}
-            </main>
-            ${renderFooter()}
-        `;
+        app.innerHTML = `${renderHeader()}<main class="flex-1">${renderHero()}${renderNewsletterSection()}${renderPublications()}</main>${renderFooter()}`;
     }
 }
 
-function navigateHome() {
-    currentView = 'home';
-    selectedPublication = null;
-    renderApp();
-    window.scrollTo(0, 0);
-}
-
-function navigateAdmin() {
-    currentView = 'admin';
-    adminTab = 'publications';
-    renderApp();
-    window.scrollTo(0, 0);
-}
-
-function viewPublication(id) {
-    selectedPublication = publications.find(p => p.id === id);
-    if (selectedPublication) {
-        currentView = 'publication';
-        renderApp();
-        window.scrollTo(0, 0);
-    }
-}
-
-function filterCategory(category) {
-    selectedCategory = category;
-    renderApp();
-}
-
-function setAdminTab(tab) {
-    adminTab = tab;
-    renderApp();
-}
-
-function handleSearch(event) {
-    searchQuery = event.target.value;
-    if (event.key === 'Enter' || event.type === 'input') {
-        renderApp();
-    }
-}
-
-function scrollToPublications() {
-    const section = $('#publications');
-    if (section) {
-        section.scrollIntoView({ behavior: 'smooth' });
-    }
-}
-
-function toggleMobileMenu() {
-    const menu = $('#mobile-menu');
-    if (menu) {
-        menu.classList.toggle('open');
-    }
-}
+function navigateHome() { currentView = 'home'; selectedPublication = null; renderApp(); window.scrollTo(0, 0); }
+function navigateAdmin() { currentView = 'admin'; adminTab = 'publications'; renderApp(); window.scrollTo(0, 0); }
+function viewPublication(id) { selectedPublication = publications.find(p => p.id === id); if (selectedPublication) { currentView = 'publication'; renderApp(); window.scrollTo(0, 0); } }
+function filterCategory(category) { selectedCategory = category; renderApp(); }
+function setAdminTab(tab) { adminTab = tab; renderApp(); }
+function handleSearch(event) { searchQuery = event.target.value; if (event.key === 'Enter' || event.type === 'input') renderApp(); }
+function scrollToPublications() { const section = $('#publications'); if (section) section.scrollIntoView({ behavior: 'smooth' }); }
+function toggleMobileMenu() { const menu = $('#mobile-menu'); if (menu) menu.classList.toggle('open'); }
 
 async function handleNewsletterSubmit(event) {
     event.preventDefault();
-    const email = event.target.querySelector('input[type="email"]').value;
-    
     try {
-        await subscribeNewsletter(email);
+        await subscribeNewsletter(event.target.querySelector('input[type="email"]').value);
         showToast('¡Gracias por suscribirte!', 'success');
         event.target.reset();
-    } catch (error) {
-        showToast('Error al suscribir', 'error');
-    }
+    } catch (error) { showToast('Error al suscribir', 'error'); }
 }
 
-// 🟢 CORREGIDO: Funcion subir logo, ya guarda en Supabase
 async function handleLogoUpload(event) {
     const file = event.target.files[0];
     if (file) {
@@ -1343,7 +903,6 @@ async function handleLogoUpload(event) {
     }
 }
 
-// 🟢 CORREGIDO: Funcion subir imagen hero, ya guarda en Supabase
 async function handleHeroUpload(event) {
     const file = event.target.files[0];
     if (file) {
@@ -1355,16 +914,13 @@ async function handleHeroUpload(event) {
     }
 }
 
-// 🟢 CORREGIDO: Funcion guardar textos, ya guarda en Supabase
 async function handleSiteTextsSubmit(event) {
     event.preventDefault();
     const form = event.target;
-    
     siteConfig.name = form.name.value;
     siteConfig.heroTitle = form.heroTitle.value;
     siteConfig.heroSubtitle = form.heroSubtitle.value;
     siteConfig.footerText = form.footerText.value;
-    
     await saveSiteConfig(siteConfig);
     showToast('Configuración guardada', 'success');
     renderApp();
@@ -1375,52 +931,18 @@ async function handleSiteTextsSubmit(event) {
 // ============================================
 async function init() {
     showLoading(true);
-    
-    // Inicializar Supabase o cargar datos locales
     await initSupabase();
     
-    // Cargar datos guardados en la base de datos
     if (supabaseClient) {
         await loadSiteConfig();
         await loadPublications();
     }
     
-    // Si no hay publicaciones, crear datos de ejemplo
     if (publications.length === 0) {
         publications = [
-            {
-                id: generateId(),
-                title: 'El arte de la contemplación',
-                excerpt: 'En la quietud del atardecer, cuando los pensamientos se vuelven susurros, descubrimos que la verdadera sabiduría habita en los silencios.',
-                content: 'En la quietud del atardecer, cuando los pensamientos se vuelven susurros, descubrimos que la verdadera sabiduría habita en los silencios.\n\nLa contemplación no es simplemente pensar, es permitir que el pensamiento se disuelva en la experiencia pura de existir. Es en esos momentos de calma absoluta donde las grandes verdades se revelan, no como conceptos, sino como vivencias.\n\nCuando contemplamos una flor, no la analizamos. La dejamos ser, y en ese dejar ser, nosotros también somos. Esta es la paradoja más hermosa de la existencia: que al perder el ego en la admiracion de algo exterior, nos encontramos más plenamente que nunca.',
-                author: 'María Elena Vargas',
-                category: 'Reflexiones',
-                image: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=800&q=80',
-                date: formatDate(new Date()),
-                readTime: '5 min'
-            },
-            {
-                id: generateId(),
-                title: 'Palabras que sanan',
-                excerpt: 'Hay frases que llegan en el momento exacto, como si el universo conspirara para ofrecernos exactamente lo que necesitamos escuchar.',
-                content: 'Hay frases que llegan en el momento exacto, como si el universo conspirara para ofrecernos exactamente lo que necesitamos escuchar.\n\nLa poesía tiene este poder misterioso: puede transformar el dolor en belleza, la confusión en claridad, la soledad en conexión. No porque resuelva nuestros problemas, sino porque nos recuerda que somos más grandes que ellos.\n\nRecuerdo la primera vez que leí a Rilke: "Si tu vida cotidiana te parece pobre, no la culpes; culpaste a ti mismo porque no eres poeta para sacar su riqueza". Esas palabras me atravesaron como una flecha.',
-                author: 'Carlos Mendoza',
-                category: 'Poesía',
-                image: 'https://images.unsplash.com/photo-1456513080510-7bf3a84b82f8?w=800&q=80',
-                date: formatDate(new Date(Date.now() - 86400000)),
-                readTime: '4 min'
-            },
-            {
-                id: generateId(),
-                title: 'El jardín de los libros',
-                excerpt: 'Cada libro es una semilla que plantamos en nuestra mente. Algunos germinan de inmediato, otros esperan años bajo la tierra de nuestra memoria.',
-                content: 'Cada libro es una semilla que plantamos en nuestra mente. Algunos germinan de inmediato, otros esperan años bajo la tierra de nuestra memoria.\n\nHay libros que cambian vidas. No es una exageración ni una frase hecha. Es una verdad que cualquiera que haya amado la lectura puede confirmar. Ese momento en que las páginas dejan de ser papel y tinta para convertirse en espejos, ventanas, puentes.\n\nMi abuela tenia una biblioteca que parecia un bosque encantado. Los libros apilados hasta el techo, el olor a papel viejo y tiempo, la luz que entraba por las ventanas y pintaba de oro los lomos gastados.',
-                author: 'Ana Lucía Fernández',
-                category: 'Ensayos',
-                image: 'https://images.unsplash.com/photo-1481627834876-b7833e8f5570?w=800&q=80',
-                date: formatDate(new Date(Date.now() - 172800000)),
-                readTime: '6 min'
-            }
+            { id: generateId(), title: 'El arte de la contemplación', excerpt: 'En la quietud del atardecer...', content: 'En la quietud del atardecer...\n\nLa contemplación...', author: 'María Elena Vargas', category: 'Reflexiones', image: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=800&q=80', date: formatDate(new Date()), readTime: '5 min' },
+            { id: generateId(), title: 'Palabras que sanan', excerpt: 'Hay frases que llegan...', content: 'Hay frases que llegan...\n\nLa poesía...', author: 'Carlos Mendoza', category: 'Poesía', image: 'https://images.unsplash.com/photo-1456513080510-7bf3a84b82f8?w=800&q=80', date: formatDate(new Date(Date.now() - 86400000)), readTime: '4 min' },
+            { id: generateId(), title: 'El jardín de los libros', excerpt: 'Cada libro es una semilla...', content: 'Cada libro es una semilla...\n\nHay libros...', author: 'Ana Lucía Fernández', category: 'Ensayos', image: 'https://images.unsplash.com/photo-1481627834876-b7833e8f5570?w=800&q=80', date: formatDate(new Date(Date.now() - 172800000)), readTime: '6 min' }
         ];
         saveLocalData();
     }
@@ -1452,5 +974,5 @@ window.handleSiteTextsSubmit = handleSiteTextsSubmit;
 window.scrollToPublications = scrollToPublications;
 window.publications = publications;
 
-// Iniciar cuando el DOM esté listo
 document.addEventListener('DOMContentLoaded', init);
+
