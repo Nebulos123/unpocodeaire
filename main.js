@@ -294,8 +294,26 @@ function openModal(content) {
     closeModal();
     const overlay = document.createElement('div');
     overlay.className = 'modal-overlay open';
+    overlay.id = 'modal-overlay';
     overlay.innerHTML = `<div class="modal">${content}</div>`;
-    overlay.addEventListener('click', (e) => { if (e.target === overlay) closeModal(); });
+    
+    // Variables para rastrear dónde empieza el clic
+    let clickStartedOnOverlay = false;
+
+    overlay.addEventListener('mousedown', (e) => {
+        // Guardamos si el clic empezó en el fondo oscuro
+        clickStartedOnOverlay = (e.target === overlay);
+    });
+
+    overlay.addEventListener('mouseup', (e) => {
+        // Solo cerramos si el clic empezó Y terminó en el fondo oscuro
+        // Esto evita que se cierre al seleccionar texto dentro del modal
+        if (e.target === overlay && clickStartedOnOverlay) {
+            closeModal();
+        }
+        clickStartedOnOverlay = false;
+    });
+    
     document.body.appendChild(overlay);
     currentModal = overlay;
 }
