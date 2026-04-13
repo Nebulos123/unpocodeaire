@@ -11,13 +11,12 @@ let supabaseClient = null;
 let currentUser = null;
 let isAdmin = false;
 
-// Datos locales (se sincronizarán con Supabase)
 let siteConfig = {
     name: 'Letras & Reflexiones',
     logo: 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTAwIiBoZWlnaHQ9IjEwMCIgdmlld0JveD0iMCAwIDEwMCAxMDAiIGZpbGw9Im5vbmUiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+PGNpcmNsZSBjeD0iNTAiIGN5PSI1MCIgcj0iNTAiIGZpbGw9IiM4NTkzN2UiLz48cGF0aCBkPSJNNjUgMzBMMzUgNTBMODEwMEw2NSAxMDBMNzAgNzBMMTAwIDUwTDcwIDMwTDY1IDMwWiIgZmlsbD0iI2ZlZmRmZCIvPjwvc3ZnPg==',
     heroImage: '',
     heroTitle: 'Un espacio para la curiosidad',
-    heroSubtitle: 'Exploramos el mundo a través de las palabras. Reflexiones, poesía y ensayos que despiertan el pensamiento y alimentan el alma.',
+    heroSubtitle: 'Exploramos el mundo a través de las palabras.',
     footerText: 'Un espacio para la curiosidad, la reflexión y la belleza de las palabras.'
 };
 
@@ -58,78 +57,38 @@ function icon(name, size = 'icon-sm') {
 // ============================================
 // UTILIDADES
 // ============================================
-function $(selector) {
-    return document.querySelector(selector);
-}
-
-function $$(selector) {
-    return document.querySelectorAll(selector);
-}
+function $(selector) { return document.querySelector(selector); }
+function $$(selector) { return document.querySelectorAll(selector); }
 
 function showToast(message, type = 'info') {
     const container = $('#toast-container');
-    if (!container) return;
     const toast = document.createElement('div');
     toast.className = `toast ${type}`;
     toast.innerHTML = message;
     container.appendChild(toast);
-    
-    setTimeout(() => {
-        toast.remove();
-    }, 4000);
+    setTimeout(() => { toast.remove(); }, 4000);
 }
 
 function showLoading(show = true) {
     const overlay = $('#loading-overlay');
-    if (!overlay) return;
-    if (show) {
-        overlay.classList.remove('hidden');
-    } else {
-        overlay.classList.add('hidden');
-    }
+    if (show) { overlay.classList.remove('hidden'); } else { overlay.classList.add('hidden'); }
 }
 
 function formatDate(date) {
-    return new Date(date).toLocaleDateString('es-ES', {
-        day: 'numeric',
-        month: 'short',
-        year: 'numeric'
-    });
+    return new Date(date).toLocaleDateString('es-ES', { day: 'numeric', month: 'short', year: 'numeric' });
 }
 
-function generateId() {
-    return Date.now().toString(36) + Math.random().toString(36).substr(2);
-}
-
-function getInitials(name) {
-    if (!name) return '??';
-    return name.split(' ').map(n => n[0]).join('').toUpperCase().substr(0, 2);
-}
-
-function escapeHtml(text) {
-    if (!text) return '';
-    const div = document.createElement('div');
-    div.textContent = text;
-    return div.innerHTML;
-}
+function generateId() { return Date.now().toString(36) + Math.random().toString(36).substr(2); }
+function getInitials(name) { return name.split(' ').map(n => n[0]).join('').toUpperCase().substr(0, 2); }
+function escapeHtml(text) { const div = document.createElement('div'); div.textContent = text; return div.innerHTML; }
 
 // ============================================
 // ALMACENAMIENTO LOCAL (FALLBACK)
 // ============================================
 const storage = {
-    get(key) {
-        try {
-            return JSON.parse(localStorage.getItem(key));
-        } catch {
-            return null;
-        }
-    },
-    set(key, value) {
-        localStorage.setItem(key, JSON.stringify(value));
-    },
-    remove(key) {
-        localStorage.removeItem(key);
-    }
+    get(key) { try { return JSON.parse(localStorage.getItem(key)); } catch { return null; } },
+    set(key, value) { localStorage.setItem(key, JSON.stringify(value)); },
+    remove(key) { localStorage.removeItem(key); }
 };
 
 // ============================================
@@ -140,25 +99,21 @@ async function initSupabase() {
         supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
         console.log("🚀 Conectando a Supabase...");
         
-        // Verificar sesión existente
         const { data: { session } } = await supabaseClient.auth.getSession();
         if (session) {
             currentUser = session.user;
             isAdmin = currentUser.email === ADMIN_EMAIL;
-            console.log("👤 Sesión recuperada:", currentUser.email);
         }
         
-        // Escuchar cambios de autenticación
         supabaseClient.auth.onAuthStateChange((event, session) => {
             currentUser = session?.user || null;
             isAdmin = currentUser?.email === ADMIN_EMAIL;
-            console.log("🔐 Cambio de estado auth:", event);
             renderApp();
         });
         
         return true;
     } catch (error) {
-        console.error('❌ Error inicializando Supabase:', error);
+        console.error('❌ Error Supabase:', error);
         loadLocalData();
         return false;
     }
@@ -167,46 +122,23 @@ async function initSupabase() {
 function loadLocalData() {
     const savedConfig = storage.get('siteConfig');
     if (savedConfig) siteConfig = { ...siteConfig, ...savedConfig };
-    
     const savedPubs = storage.get('publications');
     if (savedPubs) publications = savedPubs;
-    
-    const savedEmails = storage.get('newsletterEmails');
-    if (savedEmails) newsletterEmails = savedEmails;
-    
-    const savedUser = storage.get('currentUser');
-    if (savedUser) {
-        currentUser = savedUser;
-        isAdmin = savedUser.email === ADMIN_EMAIL;
-    }
 }
 
 function saveLocalData() {
     storage.set('siteConfig', siteConfig);
     storage.set('publications', publications);
-    storage.set('newsletterEmails', newsletterEmails);
 }
 
 // ============================================
 // AUTENTICACIÓN
 // ============================================
 async function signUp(email, password, name) {
-    if (!supabaseClient) {
-        const user = { id: generateId(), email, user_metadata: { name } };
-        currentUser = user;
-        isAdmin = email === ADMIN_EMAIL;
-        storage.set('currentUser', currentUser);
-        showToast('¡Cuenta creada! Bienvenido ' + name, 'success');
-        renderApp();
-        return { success: true };
-    }
-    
     try {
-        const { data, error } = await supabaseClient.auth.signUp({
-            email, password, options: { data: { name } }
-        });
+        const { data, error } = await supabaseClient.auth.signUp({ email, password, options: { data: { name } } });
         if (error) throw error;
-        showToast('¡Revisa tu email para confirmar!', 'success');
+        showToast('¡Revisa tu email!', 'success');
         return { success: true, data };
     } catch (error) {
         showToast('Error: ' + error.message, 'error');
@@ -215,22 +147,12 @@ async function signUp(email, password, name) {
 }
 
 async function signIn(email, password) {
-    if (!supabaseClient) {
-        const user = { id: generateId(), email, user_metadata: { name: email.split('@')[0] } };
-        currentUser = user;
-        isAdmin = email === ADMIN_EMAIL;
-        storage.set('currentUser', currentUser);
-        showToast('¡Bienvenido!', 'success');
-        renderApp();
-        return { success: true };
-    }
-    
     try {
         const { data, error } = await supabaseClient.auth.signInWithPassword({ email, password });
         if (error) throw error;
         currentUser = data.user;
         isAdmin = currentUser.email === ADMIN_EMAIL;
-        showToast('¡Bienvenido!', 'success');
+        showToast('¡Bienvenida!', 'success');
         closeModal();
         renderApp();
         return { success: true, data };
@@ -241,25 +163,14 @@ async function signIn(email, password) {
 }
 
 async function signOut() {
-    if (!supabaseClient) {
-        currentUser = null; isAdmin = false;
-        storage.remove('currentUser');
-        showToast('Sesión cerrada', 'info');
-        renderApp();
-        return;
-    }
-    try {
-        await supabaseClient.auth.signOut();
-        currentUser = null; isAdmin = false;
-        showToast('Sesión cerrada', 'info');
-        renderApp();
-    } catch (error) {
-        showToast('Error al cerrar sesión', 'error');
-    }
+    await supabaseClient.auth.signOut();
+    currentUser = null; isAdmin = false;
+    showToast('Sesión cerrada', 'info');
+    renderApp();
 }
 
 // ============================================
-// GESTIÓN DE PUBLICACIONES
+// GESTIÓN DE PUBLICACIONES (CORREGIDO)
 // ============================================
 async function loadPublications() {
     if (!supabaseClient) return;
@@ -268,85 +179,59 @@ async function loadPublications() {
             .from('publications')
             .select('*')
             .order('created_at', { ascending: false });
-        
         if (error) throw error;
-        if (data) publications = data;
-    } catch (error) {
-        console.error('Error cargando publicaciones:', error);
-    }
+        if (data) {
+            publications = data.map(pub => ({
+                ...pub,
+                readTime: pub.read_time // Mapeo para el código
+            }));
+        }
+    } catch (error) { console.error('Error cargando posts:', error); }
 }
 
 async function savePublication(pub) {
-    const isNew = !pub.id;
-    // Aseguramos que todos los campos estén presentes
-    const publication = {
-        id: pub.id || generateId(),
+    const pubId = pub.id || generateId();
+    const publicationToSave = {
+        id: pubId,
         title: pub.title,
         excerpt: pub.excerpt,
         content: pub.content,
         category: pub.category,
         author: pub.author,
         image: pub.image,
-        readTime: pub.readTime || '5 min', // Campo crítico
         date: pub.date || formatDate(new Date()),
-        created_at: pub.created_at || new Date().toISOString(),
+        read_time: pub.readTime, // Mapeo para DB
         updated_at: new Date().toISOString()
     };
     
-    if (!supabaseClient) {
-        if (isNew) publications.unshift(publication);
-        else {
-            const index = publications.findIndex(p => p.id === pub.id);
-            if (index >= 0) publications[index] = publication;
-        }
-        saveLocalData();
-        return publication;
-    }
-    
     try {
-        const { data, error } = await supabaseClient
-            .from('publications')
-            .upsert(publication)
-            .select()
-            .single();
-        
+        const { data, error } = await supabaseClient.from('publications').upsert(publicationToSave).select().single();
         if (error) throw error;
+        await loadPublications();
         return data;
     } catch (error) {
-        console.error('Error guardando publicación:', error);
+        showToast('Error guardando: ' + error.message, 'error');
         throw error;
     }
 }
 
 async function deletePublication(id) {
-    if (!supabaseClient) {
-        publications = publications.filter(p => p.id !== id);
-        saveLocalData();
-        return true;
-    }
-    try {
-        const { error } = await supabaseClient.from('publications').delete().eq('id', id);
-        if (error) throw error;
-        return true;
-    } catch (error) {
-        console.error('Error eliminando publicación:', error);
-        throw error;
-    }
+    const { error } = await supabaseClient.from('publications').delete().eq('id', id);
+    if (error) throw error;
+    await loadPublications();
+    renderApp();
+    return true;
 }
 
 // ============================================
-// GESTIÓN DE CONFIGURACIÓN DEL SITIO
+// CONFIGURACIÓN DEL SITIO (CORREGIDO)
 // ============================================
 async function loadSiteConfig() {
     if (!supabaseClient) return;
     try {
-        const { data, error } = await supabaseClient
-            .from('site_config')
-            .select('*')
-            .single();
+        const { data, error } = await supabaseClient.from('site_config').select('*').single();
         if (error) throw error;
         if (data) {
-            // Mapeo de columnas snake_case a camelCase
             siteConfig = {
                 name: data.name,
                 logo: data.logo,
@@ -355,22 +240,13 @@ async function loadSiteConfig() {
                 heroSubtitle: data.hero_subtitle,
                 footerText: data.footer_text
             };
-            console.log("✅ Configuración cargada de Supabase");
         }
-    } catch (error) {
-        console.error("❌ Error cargando config:", error);
-        loadLocalData();
-    }
+    } catch (error) { console.error("Error config:", error); }
 }
 
 async function saveSiteConfig(config) {
     siteConfig = { ...siteConfig, ...config };
-    if (!supabaseClient) {
-        saveLocalData();
-        return siteConfig;
-    }
     try {
-        // Mapeo inverso: camelCase a snake_case para la BD
         const dataToSave = {
             id: 1,
             name: siteConfig.name,
@@ -380,52 +256,27 @@ async function saveSiteConfig(config) {
             hero_subtitle: siteConfig.heroSubtitle,
             footer_text: siteConfig.footerText
         };
-        const { data, error } = await supabaseClient
-            .from('site_config')
-            .upsert(dataToSave)
-            .select()
-            .single();
+        const { data, error } = await supabaseClient.from('site_config').upsert(dataToSave).select().single();
         if (error) throw error;
-        console.log("✅ Guardado exitoso en Supabase");
         return data;
-    } catch (error) {
-        console.error("❌ ERROR al guardar:", error);
-        showToast('Error al guardar: ' + error.message, 'error');
-        saveLocalData();
-        throw error;
-    }
+    } catch (error) { showToast('Error: ' + error.message, 'error'); throw error; }
 }
 
 // ============================================
 // NEWSLETTER
 // ============================================
 async function subscribeNewsletter(email) {
-    if (!supabaseClient) {
-        if (!newsletterEmails.includes(email)) {
-            newsletterEmails.push(email);
-            saveLocalData();
-        }
-        return true;
-    }
     try {
         const { error } = await supabaseClient.from('newsletter').insert({ email });
         if (error) {
-            if (error.code === '23505') {
-                showToast('Este correo ya está suscrito.', 'info');
-                return true; 
-            }
+            if (error.code === '23505') { showToast('Ya estás suscrito.', 'info'); return true; }
             throw error;
         }
+        showToast('¡Gracias por suscribirte!', 'success');
         return true;
-    } catch (error) {
-        console.error('Error en newsletter:', error);
-        throw error;
-    }
+    } catch (error) { showToast('Error en suscripción', 'error'); }
 }
 
-// ============================================
-// CONVERSIÓN DE IMÁGENES A BASE64
-// ============================================
 function fileToBase64(file) {
     return new Promise((resolve, reject) => {
         const reader = new FileReader();
@@ -439,195 +290,99 @@ function fileToBase64(file) {
 // MODALES
 // ============================================
 let currentModal = null;
-
 function openModal(content) {
     closeModal();
     const overlay = document.createElement('div');
     overlay.className = 'modal-overlay open';
-    overlay.id = 'modal-overlay';
     overlay.innerHTML = `<div class="modal">${content}</div>`;
-    overlay.addEventListener('click', (e) => {
-        if (e.target === overlay) closeModal();
-    });
+    overlay.addEventListener('click', (e) => { if (e.target === overlay) closeModal(); });
     document.body.appendChild(overlay);
     currentModal = overlay;
 }
-
-function closeModal() {
-    if (currentModal) {
-        currentModal.remove();
-        currentModal = null;
-    }
-}
+function closeModal() { if (currentModal) { currentModal.remove(); currentModal = null; } }
 
 function showLoginModal() {
     openModal(`
-        <div class="modal-header"><h2>Iniciar sesión</h2><p>Accede a tu cuenta</p></div>
+        <div class="modal-header"><h2>Iniciar sesión</h2></div>
         <form id="login-form" class="modal-body">
-            <div class="form-group"><label class="form-label">Email</label><input type="email" class="form-input" name="email" placeholder="tu@email.com" required></div>
-            <div class="form-group"><label class="form-label">Contraseña</label><input type="password" class="form-input" name="password" placeholder="••••••••" required minlength="6"></div>
+            <div class="form-group"><label class="form-label">Email</label><input type="email" class="form-input" name="email" required></div>
+            <div class="form-group"><label class="form-label">Contraseña</label><input type="password" class="form-input" name="password" required></div>
             <button type="submit" class="btn btn-primary" style="width: 100%">${icon('login')} Entrar</button>
         </form>
-        <div class="modal-footer"><p>¿No tienes cuenta? <button type="button" onclick="showRegisterModal()">Regístrate aquí</button></p></div>
     `);
     $('#login-form').addEventListener('submit', async (e) => {
         e.preventDefault();
-        const form = e.target;
-        const btn = form.querySelector('button[type="submit"]');
-        btn.disabled = true; btn.innerHTML = '<span class="spinner"></span> Entrando...';
-        await signIn(form.email.value, form.password.value);
-    });
-}
-
-function showRegisterModal() {
-    openModal(`
-        <div class="modal-header"><h2>Crear cuenta</h2><p>Únete a nuestra comunidad</p></div>
-        <form id="register-form" class="modal-body">
-            <div class="form-group"><label class="form-label">Nombre</label><input type="text" class="form-input" name="name" placeholder="Tu nombre" required></div>
-            <div class="form-group"><label class="form-label">Email</label><input type="email" class="form-input" name="email" placeholder="tu@email.com" required></div>
-            <div class="form-group"><label class="form-label">Contraseña</label><input type="password" class="form-input" name="password" placeholder="••••••••" required minlength="6"></div>
-            <div class="form-group"><label class="form-label">Confirmar contraseña</label><input type="password" class="form-input" name="confirmPassword" placeholder="••••••••" required></div>
-            <button type="submit" class="btn btn-primary" style="width: 100%">${icon('user')} Crear cuenta</button>
-        </form>
-        <div class="modal-footer"><p>¿Ya tienes cuenta? <button type="button" onclick="showLoginModal()">Inicia sesión</button></p></div>
-    `);
-    $('#register-form').addEventListener('submit', async (e) => {
-        e.preventDefault();
-        const form = e.target;
-        if (form.password.value !== form.confirmPassword.value) {
-            showToast('Las contraseñas no coinciden', 'error'); return;
-        }
-        const btn = form.querySelector('button[type="submit"]');
-        btn.disabled = true; btn.innerHTML = '<span class="spinner"></span> Creando...';
-        await signUp(form.email.value, form.password.value, form.name.value);
+        await signIn(e.target.email.value, e.target.password.value);
     });
 }
 
 function showNewsletterModal() {
     openModal(`
-        <div class="modal-header"><div class="modal-icon">${icon('mail', 'icon-lg')}</div><h2>Suscríbete al Newsletter</h2><p>Recibe las mejores publicaciones en tu correo</p></div>
+        <div class="modal-header"><h2>Newsletter</h2><p>Recibe lo mejor en tu correo</p></div>
         <form id="newsletter-form" class="modal-body">
-            <div class="form-group"><label class="form-label">Tu email</label><input type="email" class="form-input" name="email" placeholder="tu@email.com" required></div>
+            <div class="form-group"><input type="email" class="form-input" name="email" placeholder="tu@email.com" required></div>
             <button type="submit" class="btn btn-primary" style="width: 100%">${icon('mail')} Suscribirme</button>
-            <p class="form-helper text-center mt-4">Respetamos tu privacidad.</p>
         </form>
     `);
     $('#newsletter-form').addEventListener('submit', async (e) => {
         e.preventDefault();
-        try {
-            await subscribeNewsletter(e.target.email.value);
-            showToast('¡Gracias por suscribirte!', 'success');
-            closeModal();
-        } catch (error) {
-            showToast('Error al suscribir.', 'error');
-        }
+        await subscribeNewsletter(e.target.email.value);
+        closeModal();
     });
 }
 
 function showPublicationModal(pub = null) {
     const isEdit = !!pub;
-    const defaultPub = { title: '', excerpt: '', content: '', category: 'Reflexiones', author: '', image: '', readTime: '5 min' };
-    const data = pub || defaultPub;
-    
+    const data = pub || { title: '', excerpt: '', content: '', category: 'Reflexiones', author: '', image: '', readTime: '5 min' };
     openModal(`
         <div class="modal-header"><h2>${isEdit ? 'Editar' : 'Nueva'} Publicación</h2></div>
         <form id="publication-form" class="modal-body">
-            <div class="form-group"><label class="form-label">Título</label><input type="text" class="form-input" name="title" value="${escapeHtml(data.title)}" required></div>
-            <div class="form-group"><label class="form-label">Categoría</label>
-                <select class="form-input" name="category" required>
+            <div class="form-group"><label class="form-label">Título</label><input type="text" class="form-input" name="title" value="${data.title}" required></div>
+            <div class="form-group">
+                <label class="form-label">Categoría</label>
+                <select class="form-input" name="category">
                     <option value="Reflexiones" ${data.category === 'Reflexiones' ? 'selected' : ''}>Reflexiones</option>
                     <option value="Poesía" ${data.category === 'Poesía' ? 'selected' : ''}>Poesía</option>
                     <option value="Ensayos" ${data.category === 'Ensayos' ? 'selected' : ''}>Ensayos</option>
-                    <option value="Naturaleza" ${data.category === 'Naturaleza' ? 'selected' : ''}>Naturaleza</option>
                 </select>
             </div>
-            <div class="form-group"><label class="form-label">Autor</label><input type="text" class="form-input" name="author" value="${escapeHtml(data.author)}" required></div>
-            <div class="form-group"><label class="form-label">Tiempo de lectura</label><input type="text" class="form-input" name="readTime" value="${escapeHtml(data.readTime)}" placeholder="5 min"></div>
-            <div class="form-group"><label class="form-label">Extracto</label><textarea class="form-input" name="excerpt" rows="2" required>${escapeHtml(data.excerpt)}</textarea></div>
-            <div class="form-group"><label class="form-label">Contenido</label><textarea class="form-input" name="content" rows="6" required>${escapeHtml(data.content)}</textarea></div>
-            <div class="form-group"><label class="form-label">Imagen</label>
-                <div class="file-input-wrapper">
-                    <input type="file" class="file-input" name="image" id="pub-image-input" accept="image/*">
-                    <label for="pub-image-input" class="file-input-label">${icon('upload', 'icon-md')}<span>Click para subir imagen</span></label>
-                    <div id="pub-image-preview" class="${data.image ? '' : 'hidden'}"><img src="${data.image}" class="file-preview" alt="Preview"></div>
-                </div>
+            <div class="form-group"><label class="form-label">Autor</label><input type="text" class="form-input" name="author" value="${data.author}" required></div>
+            <div class="form-group"><label class="form-label">Tiempo</label><input type="text" class="form-input" name="readTime" value="${data.readTime}"></div>
+            <div class="form-group"><label class="form-label">Extracto</label><textarea class="form-input" name="excerpt">${data.excerpt}</textarea></div>
+            <div class="form-group"><label class="form-label">Contenido</label><textarea class="form-input" name="content" rows="6">${data.content}</textarea></div>
+            <div class="form-group">
+                <label class="form-label">Imagen</label>
+                <input type="file" id="pub-image-input" accept="image/*">
+                <input type="hidden" name="existingImage" value="${data.image}">
             </div>
-            <input type="hidden" name="id" value="${data.id || ''}">
-            <input type="hidden" name="existingImage" value="${data.image || ''}">
-            <div class="flex gap-3">
-                <button type="button" class="btn btn-secondary" style="flex: 1" onclick="closeModal()">Cancelar</button>
-                <button type="submit" class="btn btn-primary" style="flex: 1">${icon('save')} ${isEdit ? 'Guardar' : 'Crear'}</button>
-            </div>
+            <button type="submit" class="btn btn-primary" style="width: 100%">${icon('save')} Guardar</button>
         </form>
     `);
-    
-    const imageInput = $('#pub-image-input');
-    if (imageInput) {
-        imageInput.addEventListener('change', async (e) => {
-            const file = e.target.files[0];
-            if (file) {
-                const base64 = await fileToBase64(file);
-                const previewDiv = $('#pub-image-preview');
-                previewDiv.innerHTML = `<img src="${base64}" class="file-preview" alt="Preview">`;
-                previewDiv.classList.remove('hidden');
-            }
-        });
-    }
-    
     $('#publication-form').addEventListener('submit', async (e) => {
         e.preventDefault();
         const form = e.target;
         let imageData = form.existingImage.value;
-        if (form.image.files[0]) imageData = await fileToBase64(form.image.files[0]);
+        const file = $('#pub-image-input').files[0];
+        if (file) imageData = await fileToBase64(file);
         
-        const publication = {
-            id: form.id.value || null,
+        await savePublication({
+            id: pub?.id,
             title: form.title.value,
             excerpt: form.excerpt.value,
             content: form.content.value,
             category: form.category.value,
             author: form.author.value,
-            readTime: form.readTime.value || '5 min',
-            image: imageData,
-            date: pub?.date || formatDate(new Date())
-        };
-        
-        try {
-            await savePublication(publication);
-            showToast(isEdit ? 'Publicación actualizada' : 'Publicación creada', 'success');
-            closeModal();
-            renderApp();
-        } catch (error) {
-            showToast('Error al guardar: ' + error.message, 'error');
-        }
+            readTime: form.readTime.value,
+            image: imageData
+        });
+        showToast('Guardado', 'success');
+        closeModal();
+        renderApp();
     });
 }
 
-function showDeleteConfirmation(id) {
-    openModal(`
-        <div class="modal-header"><h2>Eliminar publicación</h2><p>¿Estás seguro?</p></div>
-        <div class="modal-body">
-            <div class="flex gap-3">
-                <button class="btn btn-secondary" style="flex: 1" onclick="closeModal()">Cancelar</button>
-                <button class="btn btn-error" style="flex: 1" onclick="confirmDelete('${id}')">${icon('trash')} Eliminar</button>
-            </div>
-        </div>
-    `);
-}
-
-async function confirmDelete(id) {
-    try {
-        await deletePublication(id);
-        showToast('Publicación eliminada', 'success');
-        closeModal();
-        renderApp();
-    } catch (error) {
-        showToast('Error al eliminar', 'error');
-    }
-}
-
 // ============================================
-// VISTAS Y RENDERIZADO
+// VISTAS Y NAVEGACIÓN (Recuperando original)
 // ============================================
 let currentView = 'home';
 let selectedPublication = null;
@@ -640,7 +395,7 @@ function renderHeader() {
         <header class="header">
             <div class="header-inner">
                 <button class="logo" onclick="navigateHome()">
-                    <img src="${siteConfig.logo}" alt="Logo" class="logo-img">
+                    <img src="${siteConfig.logo}" class="logo-img">
                     <span class="logo-text">${siteConfig.name}</span>
                 </button>
                 <div class="header-actions desktop">
@@ -651,328 +406,125 @@ function renderHeader() {
                     <button class="btn btn-outline" onclick="showNewsletterModal()">${icon('mail')} Newsletter</button>
                     ${currentUser ? `
                         <div class="user-menu">
-                            <div class="user-avatar">${getInitials(currentUser.user_metadata?.name || currentUser.email)}</div>
-                            <span class="text-sm">${currentUser.user_metadata?.name || currentUser.email.split('@')[0]}</span>
+                            <span class="text-sm">${currentUser.email.split('@')[0]}</span>
                             ${isAdmin ? `<button class="btn btn-secondary btn-sm" onclick="navigateAdmin()">${icon('settings')} Admin</button>` : ''}
                             <button class="btn btn-ghost btn-sm" onclick="signOut()">${icon('logout')} Salir</button>
                         </div>
-                    ` : `
-                        <button class="btn btn-ghost" onclick="showLoginModal()">${icon('login')} Entrar</button>
-                        <button class="btn btn-primary" onclick="showRegisterModal()">${icon('user')} Registrarse</button>
-                    `}
+                    ` : `<button class="btn btn-primary" onclick="showLoginModal()">${icon('login')} Entrar</button>`}
                 </div>
-                <button class="btn btn-icon btn-ghost mobile-menu-btn" onclick="toggleMobileMenu()">${icon('menu', 'icon-md')}</button>
             </div>
-            <div class="mobile-menu" id="mobile-menu">
-                <div class="form-group"><input type="text" class="form-input" placeholder="Buscar..." value="${escapeHtml(searchQuery)}" onkeyup="handleSearch(event)"></div>
-                <button class="btn btn-outline mb-3" onclick="showNewsletterModal()">${icon('mail')} Newsletter</button>
-                ${currentUser ? `
-                    <div class="user-menu">
-                        <div class="flex items-center gap-2 mb-3"><div class="user-avatar">${getInitials(currentUser.user_metadata?.name || currentUser.email)}</div><span>${currentUser.user_metadata?.name || currentUser.email.split('@')[0]}</span></div>
-                        ${isAdmin ? `<button class="btn btn-secondary mb-2" onclick="navigateAdmin()">${icon('settings')} Panel Admin</button>` : ''}
-                        <button class="btn btn-ghost" onclick="signOut()">${icon('logout')} Cerrar sesión</button>
-                    </div>
-                ` : `
-                    <div class="flex gap-2"><button class="btn btn-outline" onclick="showLoginModal()" style="flex: 1">Entrar</button><button class="btn btn-primary" onclick="showRegisterModal()" style="flex: 1">Registrarse</button></div>
-                `}
-            </div>
-        </header>
-    `;
+        </header>`;
 }
 
 function renderHero() {
     return `
         <section class="hero">
-            <div class="hero-bg">${siteConfig.heroImage ? `<img src="${siteConfig.heroImage}" alt="">` : ''}<div class="hero-overlay"></div></div>
+            <div class="hero-bg">${siteConfig.heroImage ? `<img src="${siteConfig.heroImage}">` : ''}<div class="hero-overlay"></div></div>
             <div class="hero-content">
-                <div class="hero-logo"><img src="${siteConfig.logo}" alt="Logo"></div>
-                <h1>${escapeHtml(siteConfig.heroTitle)}</h1>
-                <p>${escapeHtml(siteConfig.heroSubtitle)}</p>
+                <div class="hero-logo"><img src="${siteConfig.logo}"></div>
+                <h1>${siteConfig.heroTitle}</h1>
+                <p>${siteConfig.heroSubtitle}</p>
                 <div class="hero-buttons">
-                    <button class="btn btn-lg" style="background: var(--color-cream); color: var(--color-brown);" onclick="showNewsletterModal()">${icon('mail')} Suscríbete al Newsletter</button>
-                    <button class="btn btn-lg btn-outline" style="border-color: var(--color-cream); color: var(--color-cream);" onclick="scrollToPublications()">Explorar publicaciones</button>
+                    <button class="btn btn-lg btn-primary" onclick="showNewsletterModal()">Suscribirse</button>
+                    <button class="btn btn-lg btn-outline" style="color:white; border-color:white;" onclick="document.getElementById('publications').scrollIntoView({behavior:'smooth'})">Explorar</button>
                 </div>
             </div>
-            <div class="hero-wave"><svg viewBox="0 0 1440 120" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M0 120L60 110C120 100 240 80 360 70C480 60 600 60 720 65C840 70 960 80 1080 85C1200 90 1320 90 1380 90L1440 90V120H1380C1320 120 1200 120 1080 120C960 120 840 120 720 120C600 120 480 120 360 120C240 120 120 120 60 120H0Z" fill="#fefdfd"/></svg></div>
-        </section>
-    `;
-}
-
-function renderNewsletterSection() {
-    return `
-        <section class="newsletter-section">
-            ${icon('mail', 'icon-lg')}
-            <h2>¿Te gusta lo que lees?</h2>
-            <p>Suscríbete a nuestro newsletter semanal.</p>
-            <form class="newsletter-form" onsubmit="handleNewsletterSubmit(event)">
-                <input type="email" class="form-input" placeholder="tu@email.com" required>
-                <button type="submit" class="btn btn-primary">Suscribirse</button>
-            </form>
-        </section>
-    `;
+            <div class="hero-wave"><svg viewBox="0 0 1440 120" fill="none"><path d="M0 120L60 110C120 100 240 80 360 70C480 60 600 60 720 65C840 70 960 80 1080 85C1200 90 1320 90 1380 90L1440 90V120H0Z" fill="#fefdfd"/></svg></div>
+        </section>`;
 }
 
 function renderPublications() {
     const filtered = publications.filter(pub => {
         const matchesCategory = selectedCategory === 'Todos' || pub.category === selectedCategory;
-        const matchesSearch = pub.title.toLowerCase().includes(searchQuery.toLowerCase()) || pub.excerpt.toLowerCase().includes(searchQuery.toLowerCase());
+        const matchesSearch = pub.title.toLowerCase().includes(searchQuery.toLowerCase());
         return matchesCategory && matchesSearch;
     });
-    const categories = ['Todos', 'Reflexiones', 'Poesía', 'Ensayos', 'Naturaleza'];
-    
+    const cats = ['Todos', 'Reflexiones', 'Poesía', 'Ensayos'];
     return `
         <section class="publications-section" id="publications">
-            <h2>Publicaciones recientes</h2>
             <div class="category-filters">
-                ${categories.map(cat => `<button class="category-btn ${selectedCategory === cat ? 'active' : ''}" onclick="filterCategory('${cat}')">${cat}</button>`).join('')}
+                ${cats.map(c => `<button class="category-btn ${selectedCategory === c ? 'active' : ''}" onclick="filterCategory('${c}')">${c}</button>`).join('')}
             </div>
-            ${filtered.length > 0 ? `
-                <div class="publications-grid">
-                    ${filtered.map(pub => `
-                        <article class="publication-card" onclick="viewPublication('${pub.id}')">
-                            <div class="publication-image">
-                                <img src="${pub.image || 'https://images.unsplash.com/photo-1481627834876-b7833e8f5570?w=800&q=80'}" alt="${escapeHtml(pub.title)}">
-                                <div class="publication-image-overlay"></div>
-                                <span class="publication-category">${pub.category}</span>
-                                <h3 class="publication-title">${escapeHtml(pub.title)}</h3>
-                            </div>
-                            <div class="publication-content">
-                                <p class="publication-excerpt">${escapeHtml(pub.excerpt)}</p>
-                                <div class="publication-meta">
-                                    <div class="publication-author"><div class="publication-author-avatar">${getInitials(pub.author)}</div><span>${escapeHtml(pub.author)}</span></div>
-                                    <div class="publication-info"><span>${icon('calendar', 'icon-sm')} ${pub.date}</span><span>${icon('clock', 'icon-sm')} ${pub.readTime}</span></div>
-                                </div>
-                            </div>
-                        </article>
-                    `).join('')}
-                </div>
-            ` : `<div class="empty-state"><p>No se encontraron publicaciones.</p></div>`}
-        </section>
-    `;
+            <div class="publications-grid">
+                ${filtered.map(pub => `
+                    <article class="publication-card" onclick="viewPublication('${pub.id}')">
+                        <div class="publication-image"><img src="${pub.image || ''}"><span class="publication-category">${pub.category}</span></div>
+                        <h3 class="publication-title">${pub.title}</h3>
+                        <div class="p-4"><p class="text-sm">${pub.excerpt}</p></div>
+                    </article>
+                `).join('')}
+            </div>
+        </section>`;
 }
 
 function renderPublicationDetail(pub) {
-    if (!pub) return '';
-    const paragraphs = pub.content.split('\n\n').filter(p => p.trim());
     return `
         <div class="publication-detail">
             <div class="publication-detail-header">
-                <img src="${pub.image || 'https://images.unsplash.com/photo-1481627834876-b7833e8f5570?w=800&q=80'}" alt="${escapeHtml(pub.title)}">
+                <img src="${pub.image || ''}">
                 <div class="publication-detail-overlay"></div>
                 <div class="publication-detail-info">
-                    <button class="btn btn-ghost" style="color: var(--color-cream); margin-bottom: 1rem;" onclick="navigateHome()">${icon('arrowLeft')} Volver</button>
-                    <span class="publication-category" style="position: static; margin-bottom: 0.5rem;">${pub.category}</span>
-                    <h1 style="font-family: var(--font-serif); font-size: 2rem; color: var(--color-cream); margin-bottom: 0.5rem;">${escapeHtml(pub.title)}</h1>
-                    <div class="flex items-center gap-4" style="color: rgba(254, 253, 253, 0.8); font-size: 0.875rem;">
-                        <div class="flex items-center gap-2"><div class="user-avatar">${getInitials(pub.author)}</div><span>${escapeHtml(pub.author)}</span></div>
-                        <span>${icon('calendar', 'icon-sm')} ${pub.date}</span>
-                        <span>${icon('clock', 'icon-sm')} ${pub.readTime}</span>
-                    </div>
+                    <button class="btn btn-ghost" style="color:white" onclick="navigateHome()">${icon('arrowLeft')} Volver</button>
+                    <h1>${pub.title}</h1>
+                    <p>${pub.author} • ${pub.date}</p>
                 </div>
             </div>
             <div class="publication-detail-content">
-                ${paragraphs.map(p => `<p>${escapeHtml(p)}</p>`).join('')}
-                <div class="publication-actions">
-                    <button class="btn btn-outline">${icon('heart')} Me gusta</button>
-                    <button class="btn btn-outline">${icon('bookmark')} Guardar</button>
-                    <button class="btn btn-outline">${icon('share')} Compartir</button>
-                </div>
-                <div class="author-card">
-                    <div class="author-card-avatar">${getInitials(pub.author)}</div>
-                    <div><h3>${escapeHtml(pub.author)}</h3><p>Escritor y colaborador de ${siteConfig.name}</p></div>
-                </div>
+                ${pub.content.split('\n\n').map(p => `<p>${p}</p>`).join('')}
             </div>
-        </div>
-    `;
-}
-
-function renderFooter() {
-    return `
-        <footer class="footer">
-            <div class="footer-grid">
-                <div><div class="footer-brand"><img src="${siteConfig.logo}" alt="Logo"><span>${siteConfig.name}</span></div><p>${siteConfig.footerText}</p></div>
-                <div><h4>Explorar</h4><ul><li><button onclick="filterCategory('Reflexiones'); navigateHome();">Reflexiones</button></li><li><button onclick="filterCategory('Poesía'); navigateHome();">Poesía</button></li><li><button onclick="filterCategory('Ensayos'); navigateHome();">Ensayos</button></li><li><button onclick="filterCategory('Naturaleza'); navigateHome();">Naturaleza</button></li></ul></div>
-                <div><h4>Newsletter</h4><p>No te pierdas ninguna publicación.</p><button class="btn btn-outline" style="border-color: var(--color-cream); color: var(--color-cream); margin-top: 0.5rem;" onclick="showNewsletterModal()">Suscribirse</button></div>
-            </div>
-            <hr class="footer-divider">
-            <p class="footer-copyright">© ${new Date().getFullYear()} ${siteConfig.name}. Todos los derechos reservados.</p>
-        </footer>
-    `;
+        </div>`;
 }
 
 function renderAdminPanel() {
     return `
         <div class="admin-panel">
-            <div class="admin-header"><div class="admin-header-inner"><h1>${icon('settings')} Panel de Administración</h1><button class="btn btn-secondary" onclick="navigateHome()">${icon('arrowLeft')} Volver al sitio</button></div></div>
+            <div class="admin-header"><div class="admin-header-inner"><h1>Panel Admin</h1><button class="btn btn-secondary" onclick="navigateHome()">Sitio</button></div></div>
             <nav class="admin-nav">
-                <button class="admin-nav-btn ${adminTab === 'publications' ? 'active' : ''}" onclick="setAdminTab('publications')">Publicaciones</button>
-                <button class="admin-nav-btn ${adminTab === 'site' ? 'active' : ''}" onclick="setAdminTab('site')">Configuración del Sitio</button>
-                <button class="admin-nav-btn ${adminTab === 'newsletter' ? 'active' : ''}" onclick="setAdminTab('newsletter')">Newsletter</button>
+                <button class="admin-nav-btn ${adminTab === 'publications' ? 'active' : ''}" onclick="setAdminTab('publications')">Posts</button>
+                <button class="admin-nav-btn ${adminTab === 'site' ? 'active' : ''}" onclick="setAdminTab('site')">Config</button>
             </nav>
             <div class="admin-content">
-                ${adminTab === 'publications' ? renderAdminPublications() : ''}
-                ${adminTab === 'site' ? renderAdminSite() : ''}
-                ${adminTab === 'newsletter' ? renderAdminNewsletter() : ''}
-            </div>
-        </div>
-    `;
-}
-
-function renderAdminPublications() {
-    return `
-        <div class="admin-card">
-            <div class="flex justify-between items-center mb-4"><h3>Publicaciones (${publications.length})</h3><button class="btn btn-primary" onclick="showPublicationModal()">${icon('plus')} Nueva publicación</button></div>
-            ${publications.length > 0 ? `
-                <div style="overflow-x: auto;">
+                ${adminTab === 'publications' ? `
+                    <button class="btn btn-primary mb-4" onclick="showPublicationModal()">Nuevo Post</button>
                     <table class="admin-table">
-                        <thead><tr><th>Imagen</th><th>Título</th><th>Categoría</th><th>Autor</th><th>Fecha</th><th>Acciones</th></tr></thead>
-                        <tbody>
-                            ${publications.map(pub => `
-                                <tr>
-                                    <td><img src="${pub.image}" class="admin-table-img" alt=""></td>
-                                    <td>${escapeHtml(pub.title)}</td>
-                                    <td>${pub.category}</td>
-                                    <td>${escapeHtml(pub.author)}</td>
-                                    <td>${pub.date}</td>
-                                    <td><div class="admin-table-actions"><button class="btn btn-outline btn-sm" onclick="showPublicationModal(publications.find(p => p.id === '${pub.id}'))">${icon('edit')}</button><button class="btn btn-error btn-sm" onclick="showDeleteConfirmation('${pub.id}')">${icon('trash')}</button></div></td>
-                                </tr>
-                            `).join('')}
-                        </tbody>
+                        ${publications.map(p => `<tr><td>${p.title}</td><td><button onclick="showPublicationModal(publications.find(x=>x.id==='${p.id}'))">${icon('edit')}</button><button onclick="deletePublication('${p.id}')">${icon('trash')}</button></td></tr>`).join('')}
                     </table>
-                </div>
-            ` : `<div class="empty-state"><p>No hay publicaciones. ¡Crea la primera!</p></div>`}
-        </div>
-    `;
-}
-
-function renderAdminSite() {
-    return `
-        <div class="admin-card"><h3>Logo del sitio</h3><div class="logo-upload-section"><img src="${siteConfig.logo}" alt="Logo actual" class="current-logo"><div class="logo-upload-info"><h4>Logo actual</h4><p>Recomendado: imagen cuadrada de al menos 200x200px</p><div class="file-input-wrapper"><input type="file" class="file-input" id="logo-input" accept="image/*" onchange="handleLogoUpload(event)"><label for="logo-input" class="btn btn-primary">${icon('upload')} Subir nuevo logo</label></div></div></div></div>
-        <div class="admin-card"><h3>Imagen Hero</h3>${siteConfig.heroImage ? `<img src="${siteConfig.heroImage}" alt="Hero actual" class="hero-preview">` : ''}<div class="file-input-wrapper"><input type="file" class="file-input" id="hero-input" accept="image/*" onchange="handleHeroUpload(event)"><label for="hero-input" class="file-input-label">${icon('image', 'icon-md')}<span>Click para subir imagen hero</span></label></div></div>
-        <div class="admin-card"><h3>Textos del sitio</h3><form onsubmit="handleSiteTextsSubmit(event)"><div class="form-group"><label class="form-label">Nombre del sitio</label><input type="text" class="form-input" name="name" value="${escapeHtml(siteConfig.name)}"></div><div class="form-group"><label class="form-label">Título hero</label><input type="text" class="form-input" name="heroTitle" value="${escapeHtml(siteConfig.heroTitle)}"></div><div class="form-group"><label class="form-label">Subtítulo hero</label><textarea class="form-input" name="heroSubtitle" rows="2">${escapeHtml(siteConfig.heroSubtitle)}</textarea></div><div class="form-group"><label class="form-label">Texto del footer</label><textarea class="form-input" name="footerText" rows="2">${escapeHtml(siteConfig.footerText)}</textarea></div><button type="submit" class="btn btn-primary">${icon('save')} Guardar cambios</button></form></div>
-    `;
-}
-
-function renderAdminNewsletter() {
-    return `
-        <div class="admin-card"><h3>Suscriptores del Newsletter (${newsletterEmails.length})</h3><div class="stats-grid mb-6"><div class="stat-card"><div class="stat-value">${newsletterEmails.length}</div><div class="stat-label">Total suscriptores</div></div></div>${newsletterEmails.length > 0 ? `
-            <div style="overflow-x: auto;"><table class="admin-table"><thead><tr><th>Email</th><th>Fecha</th></tr></thead><tbody>${newsletterEmails.map(email => `<tr><td>${escapeHtml(email)}</td><td>-</td></tr>`).join('')}</tbody></table></div>
-        ` : `<div class="empty-state"><p>No hay suscriptores aún.</p></div>`}</div>
-    `;
+                ` : `
+                    <form onsubmit="event.preventDefault(); saveSiteConfig({name: this.name.value, heroTitle: this.heroTitle.value, heroSubtitle: this.heroSubtitle.value, footerText: this.footerText.value}).then(()=>showToast('Guardado','success'))">
+                        <div class="form-group"><label>Nombre</label><input name="name" class="form-input" value="${siteConfig.name}"></div>
+                        <div class="form-group"><label>Título</label><input name="heroTitle" class="form-input" value="${siteConfig.heroTitle}"></div>
+                        <div class="form-group"><label>Subtítulo</label><textarea name="heroSubtitle" class="form-input">${siteConfig.heroSubtitle}</textarea></div>
+                        <button type="submit" class="btn btn-primary">Guardar</button>
+                    </form>
+                `}
+            </div>
+        </div>`;
 }
 
 function renderApp() {
     const app = $('#app');
-    if (!app) return;
-    
-    if (currentView === 'admin' && isAdmin) {
-        app.innerHTML = renderAdminPanel();
-    } else if (currentView === 'publication' && selectedPublication) {
-        app.innerHTML = `${renderHeader()}<main class="flex-1">${renderPublicationDetail(selectedPublication)}</main>`;
-    } else {
-        app.innerHTML = `${renderHeader()}<main class="flex-1">${renderHero()}${renderNewsletterSection()}${renderPublications()}</main>${renderFooter()}`;
-    }
+    if (currentView === 'admin' && isAdmin) { app.innerHTML = renderAdminPanel(); }
+    else if (currentView === 'publication' && selectedPublication) { app.innerHTML = `${renderHeader()}${renderPublicationDetail(selectedPublication)}`; }
+    else { app.innerHTML = `${renderHeader()}<main>${renderHero()}${renderPublications()}</main>`; }
 }
 
-function navigateHome() { currentView = 'home'; selectedPublication = null; renderApp(); window.scrollTo(0, 0); }
-function navigateAdmin() { currentView = 'admin'; adminTab = 'publications'; renderApp(); window.scrollTo(0, 0); }
-function viewPublication(id) { selectedPublication = publications.find(p => p.id === id); if (selectedPublication) { currentView = 'publication'; renderApp(); window.scrollTo(0, 0); } }
-function filterCategory(category) { selectedCategory = category; renderApp(); }
-function setAdminTab(tab) { adminTab = tab; renderApp(); }
-function handleSearch(event) { searchQuery = event.target.value; if (event.key === 'Enter' || event.type === 'input') renderApp(); }
-function scrollToPublications() { const section = $('#publications'); if (section) section.scrollIntoView({ behavior: 'smooth' }); }
-function toggleMobileMenu() { const menu = $('#mobile-menu'); if (menu) menu.classList.toggle('open'); }
+// Eventos de navegación
+window.navigateHome = () => { currentView = 'home'; selectedPublication = null; renderApp(); };
+window.navigateAdmin = () => { currentView = 'admin'; renderApp(); };
+window.viewPublication = (id) => { selectedPublication = publications.find(p => p.id === id); currentView = 'publication'; renderApp(); window.scrollTo(0,0); };
+window.filterCategory = (cat) => { selectedCategory = cat; renderApp(); };
+window.setAdminTab = (tab) => { adminTab = tab; renderApp(); };
+window.handleSearch = (e) => { searchQuery = e.target.value; renderApp(); };
 
-async function handleNewsletterSubmit(event) {
-    event.preventDefault();
-    try {
-        await subscribeNewsletter(event.target.querySelector('input[type="email"]').value);
-        showToast('¡Gracias por suscribirte!', 'success');
-        event.target.reset();
-    } catch (error) { showToast('Error al suscribir', 'error'); }
-}
-
-async function handleLogoUpload(event) {
-    const file = event.target.files[0];
-    if (file) {
-        const base64 = await fileToBase64(file);
-        siteConfig.logo = base64;
-        await saveSiteConfig(siteConfig);
-        showToast('Logo actualizado', 'success');
-        renderApp();
-    }
-}
-
-async function handleHeroUpload(event) {
-    const file = event.target.files[0];
-    if (file) {
-        const base64 = await fileToBase64(file);
-        siteConfig.heroImage = base64;
-        await saveSiteConfig(siteConfig);
-        showToast('Imagen hero actualizada', 'success');
-        renderApp();
-    }
-}
-
-async function handleSiteTextsSubmit(event) {
-    event.preventDefault();
-    const form = event.target;
-    siteConfig.name = form.name.value;
-    siteConfig.heroTitle = form.heroTitle.value;
-    siteConfig.heroSubtitle = form.heroSubtitle.value;
-    siteConfig.footerText = form.footerText.value;
-    await saveSiteConfig(siteConfig);
-    showToast('Configuración guardada', 'success');
-    renderApp();
-}
-
-// ============================================
-// INICIALIZACIÓN DE LA APLICACIÓN
-// ============================================
 async function init() {
     showLoading(true);
     await initSupabase();
-    
     if (supabaseClient) {
         await loadSiteConfig();
         await loadPublications();
     }
-    
-    if (publications.length === 0) {
-        publications = [
-            { id: generateId(), title: 'El arte de la contemplación', excerpt: 'En la quietud del atardecer...', content: 'En la quietud del atardecer...\n\nLa contemplación...', author: 'María Elena Vargas', category: 'Reflexiones', image: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=800&q=80', date: formatDate(new Date()), readTime: '5 min' },
-            { id: generateId(), title: 'Palabras que sanan', excerpt: 'Hay frases que llegan...', content: 'Hay frases que llegan...\n\nLa poesía...', author: 'Carlos Mendoza', category: 'Poesía', image: 'https://images.unsplash.com/photo-1456513080510-7bf3a84b82f8?w=800&q=80', date: formatDate(new Date(Date.now() - 86400000)), readTime: '4 min' },
-            { id: generateId(), title: 'El jardín de los libros', excerpt: 'Cada libro es una semilla...', content: 'Cada libro es una semilla...\n\nHay libros...', author: 'Ana Lucía Fernández', category: 'Ensayos', image: 'https://images.unsplash.com/photo-1481627834876-b7833e8f5570?w=800&q=80', date: formatDate(new Date(Date.now() - 172800000)), readTime: '6 min' }
-        ];
-        saveLocalData();
-    }
-    
     showLoading(false);
     renderApp();
 }
 
-// Hacer funciones disponibles globalmente
-window.navigateHome = navigateHome;
-window.navigateAdmin = navigateAdmin;
-window.viewPublication = viewPublication;
-window.filterCategory = filterCategory;
-window.setAdminTab = setAdminTab;
-window.handleSearch = handleSearch;
-window.showLoginModal = showLoginModal;
-window.showRegisterModal = showRegisterModal;
-window.showNewsletterModal = showNewsletterModal;
-window.showPublicationModal = showPublicationModal;
-window.showDeleteConfirmation = showDeleteConfirmation;
-window.confirmDelete = confirmDelete;
-window.closeModal = closeModal;
-window.signOut = signOut;
-window.toggleMobileMenu = toggleMobileMenu;
-window.handleNewsletterSubmit = handleNewsletterSubmit;
-window.handleLogoUpload = handleLogoUpload;
-window.handleHeroUpload = handleHeroUpload;
-window.handleSiteTextsSubmit = handleSiteTextsSubmit;
-window.scrollToPublications = scrollToPublications;
-window.publications = publications;
-
 document.addEventListener('DOMContentLoaded', init);
-
