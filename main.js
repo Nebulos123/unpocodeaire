@@ -439,18 +439,32 @@ function renderPublications() {
         const matchesSearch = pub.title.toLowerCase().includes(searchQuery.toLowerCase());
         return matchesCategory && matchesSearch;
     });
+
     const cats = ['Todos', 'Reflexiones', 'Poesía', 'Ensayos'];
+
     return `
         <section class="publications-section" id="publications">
             <div class="category-filters">
-                ${cats.map(c => `<button class="category-btn ${selectedCategory === c ? 'active' : ''}" onclick="filterCategory('${c}')">${c}</button>`).join('')}
+                ${cats.map(c => `
+                    <button class="category-btn ${selectedCategory === c ? 'active' : ''}" 
+                            onclick="filterCategory('${c}')">${c}</button>
+                `).join('')}
             </div>
             <div class="publications-grid">
                 ${filtered.map(pub => `
                     <article class="publication-card" onclick="viewPublication('${pub.id}')">
-                        <div class="publication-image"><img src="${pub.image || ''}"><span class="publication-category">${pub.category}</span></div>
-                        <h3 class="publication-title">${pub.title}</h3>
-                        <div class="p-4"><p class="text-sm">${pub.excerpt}</p></div>
+                        <div class="publication-image">
+                            <img src="${pub.image || 'https://images.unsplash.com/photo-1481627834876-b7833e8f5570?w=800&q=80'}">
+                            <span class="publication-category">${pub.category}</span>
+                        </div>
+                        <div class="publication-content">
+                            <h3 class="publication-title">${pub.title}</h3>
+                            <p class="publication-excerpt">${pub.excerpt}</p>
+                            <div class="publication-meta" style="margin-top: 1rem; display: flex; justify-content: space-between; font-size: 0.8rem; color: var(--color-sage);">
+                                <span>${pub.author}</span>
+                                <span>${pub.date}</span>
+                            </div>
+                        </div>
                     </article>
                 `).join('')}
             </div>
