@@ -13,11 +13,13 @@ let isAdmin = false;
 
 let siteConfig = {
     name: 'Letras & Reflexiones',
-    logo: 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTAwIiBoZWlnaHQ9IjEwMCIgdmlld0JveD0iMCAwIDEwMCAxMDAiIGZpbGw9Im5vbmUiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+PGNpcmNsZSBjeD0iNTAiIGN5PSI1MCIgcj0iNTAiIGZpbGw9IiM4NTkzN2UiLz48cGF0aCBkPSJNNjUgMzBMMzUgNTBMODEwMEw2NSAxMDBMNzAgNzBMMTAwIDUwTDcwIDMwTDY1IDMwWiIgZmlsbD0iI2ZlZmRmZCIvPjwvc3ZnPg==',
+    logo:
+        'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTAwIiBoZWlnaHQ9IjEwMCIgdmlld0JveD0iMCAwIDEwMCAxMDAiIGZpbGw9Im5vbmUiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+PGNpcmNsZSBjeD0iNTAiIGN5PSI1MCIgcj0iNTAiIGZpbGw9IiM4NTkzN2UiLz48cGF0aCBkPSJNNjUgMzBMMzUgNTBMODEwMEw2NSAxMDBMNzAgNzBMMTAwIDUwTDcwIDMwTDY1IDMwWiIgZmlsbD0iI2ZlZmRmZCIvPjwvc3ZnPg==',
     heroImage: '',
     heroTitle: 'Un espacio para la curiosidad',
     heroSubtitle: 'Exploramos el mundo a través de las palabras.',
-    footerText: 'Un espacio para la curiosidad, la reflexión y la belleza de las palabras.'
+    footerText: 'Un espacio para la curiosidad, la reflexión y la belleza de las palabras.',
+    categories: 'Reflexiones, Poesía, Ensayos'
 };
 
 let publications = [];
@@ -49,6 +51,13 @@ const icons = {
     book: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5v-15A2.5 2.5 0 0 1 6.5 2H20v20H6.5a2.5 2.5 0 0 1 0-5H20"/></svg>',
     save: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>'
 };
+
+function getCategories() {
+    return (siteConfig.categories || '')
+        .split(',')
+        .map(c => c.trim())
+        .filter(c => c.length > 0);
+}
 
 function icon(name, size = 'icon-sm') {
     return `<span class="icon ${size}">${icons[name] || ''}</span>`;
@@ -231,6 +240,7 @@ async function loadSiteConfig() {
     try {
         const { data, error } = await supabaseClient.from('site_config').select('*').single();
         if (error) throw error;
+
         if (data) {
             siteConfig = {
                 name: data.name,
@@ -238,14 +248,18 @@ async function loadSiteConfig() {
                 heroImage: data.hero_image,
                 heroTitle: data.hero_title,
                 heroSubtitle: data.hero_subtitle,
-                footerText: data.footer_text
+                footerText: data.footer_text,
+                categories: data.categories || 'Reflexiones, Poesía, Ensayos'
             };
         }
-    } catch (error) { console.error("Error config:", error); }
+    } catch (error) {
+        console.error("Error config:", error);
+    }
 }
 
 async function saveSiteConfig(config) {
     siteConfig = { ...siteConfig, ...config };
+
     try {
         const dataToSave = {
             id: 1,
@@ -254,14 +268,24 @@ async function saveSiteConfig(config) {
             hero_image: siteConfig.heroImage,
             hero_title: siteConfig.heroTitle,
             hero_subtitle: siteConfig.heroSubtitle,
-            footer_text: siteConfig.footerText
+            footer_text: siteConfig.footerText,
+            categories: siteConfig.categories
         };
-        const { data, error } = await supabaseClient.from('site_config').upsert(dataToSave).select().single();
-        if (error) throw error;
-        return data;
-    } catch (error) { showToast('Error: ' + error.message, 'error'); throw error; }
-}
 
+        const { data, error } = await supabaseClient
+            .from('site_config')
+            .upsert(dataToSave)
+            .select()
+            .single();
+
+        if (error) throw error;
+
+        return data;
+    } catch (error) {
+        showToast('Error: ' + error.message, 'error');
+        throw error;
+    }
+}
 // ============================================
 // NEWSLETTER
 // ============================================
@@ -352,38 +376,78 @@ function showNewsletterModal() {
 
 function showPublicationModal(pub = null) {
     const isEdit = !!pub;
-    const data = pub || { title: '', excerpt: '', content: '', category: 'Reflexiones', author: '', image: '', readTime: '5 min' };
+    const categoryList = getCategories();
+    const defaultCategory = categoryList[0] || 'General';
+
+    const data = pub || {
+        title: '',
+        excerpt: '',
+        content: '',
+        category: defaultCategory,
+        author: '',
+        image: '',
+        readTime: '5 min'
+    };
+
     openModal(`
         <div class="modal-header"><h2>${isEdit ? 'Editar' : 'Nueva'} Publicación</h2></div>
         <form id="publication-form" class="modal-body">
-            <div class="form-group"><label class="form-label">Título</label><input type="text" class="form-input" name="title" value="${data.title}" required></div>
+            <div class="form-group">
+                <label class="form-label">Título</label>
+                <input type="text" class="form-input" name="title" value="${escapeHtml(data.title)}" required>
+            </div>
+
             <div class="form-group">
                 <label class="form-label">Categoría</label>
                 <select class="form-input" name="category">
-                    <option value="Reflexiones" ${data.category === 'Reflexiones' ? 'selected' : ''}>Reflexiones</option>
-                    <option value="Poesía" ${data.category === 'Poesía' ? 'selected' : ''}>Poesía</option>
-                    <option value="Ensayos" ${data.category === 'Ensayos' ? 'selected' : ''}>Ensayos</option>
+                    ${categoryList.map(cat => `
+                        <option value="${escapeHtml(cat)}" ${data.category === cat ? 'selected' : ''}>
+                            ${escapeHtml(cat)}
+                        </option>
+                    `).join('')}
                 </select>
             </div>
-            <div class="form-group"><label class="form-label">Autor</label><input type="text" class="form-input" name="author" value="${data.author}" required></div>
-            <div class="form-group"><label class="form-label">Tiempo</label><input type="text" class="form-input" name="readTime" value="${data.readTime}"></div>
-            <div class="form-group"><label class="form-label">Extracto</label><textarea class="form-input" name="excerpt">${data.excerpt}</textarea></div>
-            <div class="form-group"><label class="form-label">Contenido</label><textarea class="form-input" name="content" rows="6">${data.content}</textarea></div>
+
+            <div class="form-group">
+                <label class="form-label">Autor</label>
+                <input type="text" class="form-input" name="author" value="${escapeHtml(data.author)}" required>
+            </div>
+
+            <div class="form-group">
+                <label class="form-label">Tiempo</label>
+                <input type="text" class="form-input" name="readTime" value="${escapeHtml(data.readTime)}">
+            </div>
+
+            <div class="form-group">
+                <label class="form-label">Extracto</label>
+                <textarea class="form-input" name="excerpt">${escapeHtml(data.excerpt)}</textarea>
+            </div>
+
+            <div class="form-group">
+                <label class="form-label">Contenido</label>
+                <textarea class="form-input" name="content" rows="6">${escapeHtml(data.content)}</textarea>
+            </div>
+
             <div class="form-group">
                 <label class="form-label">Imagen</label>
                 <input type="file" id="pub-image-input" accept="image/*">
                 <input type="hidden" name="existingImage" value="${data.image}">
             </div>
-            <button type="submit" class="btn btn-primary" style="width: 100%">${icon('save')} Guardar</button>
+
+            <button type="submit" class="btn btn-primary" style="width: 100%">
+                ${icon('save')} Guardar
+            </button>
         </form>
     `);
+
     $('#publication-form').addEventListener('submit', async (e) => {
         e.preventDefault();
         const form = e.target;
         let imageData = form.existingImage.value;
         const file = $('#pub-image-input').files[0];
+
         if (file) imageData = await fileToBase64(file);
-        
+
         await savePublication({
             id: pub?.id,
             title: form.title.value,
@@ -394,6 +458,7 @@ function showPublicationModal(pub = null) {
             readTime: form.readTime.value,
             image: imageData
         });
+
         showToast('Guardado', 'success');
         closeModal();
         renderApp();
@@ -459,35 +524,41 @@ function renderPublications() {
         return matchesCategory && matchesSearch;
     });
 
-    const cats = ['Todos', 'Reflexiones', 'Poesía', 'Ensayos'];
+    const cats = ['Todos', ...getCategories()];
 
     return `
         <section class="publications-section" id="publications">
             <div class="category-filters">
                 ${cats.map(c => `
-                    <button class="category-btn ${selectedCategory === c ? 'active' : ''}" 
-                            onclick="filterCategory('${c}')">${c}</button>
+                    <button class="category-btn ${selectedCategory === c ? 'active' : ''}"
+                        onclick="filterCategory('${escapeHtml(c)}')">
+                        ${escapeHtml(c)}
+                    </button>
                 `).join('')}
             </div>
+
             <div class="publications-grid">
                 ${filtered.map(pub => `
                     <article class="publication-card" onclick="viewPublication('${pub.id}')">
                         <div class="publication-image">
                             <img src="${pub.image || 'https://images.unsplash.com/photo-1481627834876-b7833e8f5570?w=800&q=80'}">
-                            <span class="publication-category">${pub.category}</span>
+                            <span class="publication-category">${escapeHtml(pub.category)}</span>
                         </div>
+
                         <div class="publication-content">
-                            <h3 class="publication-title">${pub.title}</h3>
-                            <p class="publication-excerpt">${pub.excerpt}</p>
+                            <h3 class="publication-title">${escapeHtml(pub.title)}</h3>
+                            <p class="publication-excerpt">${escapeHtml(pub.excerpt)}</p>
+
                             <div class="publication-meta" style="margin-top: 1rem; display: flex; justify-content: space-between; font-size: 0.8rem; color: var(--color-sage);">
-                                <span>${pub.author}</span>
-                                <span>${pub.date}</span>
+                                <span>${escapeHtml(pub.author)}</span>
+                                <span>${escapeHtml(pub.date)}</span>
                             </div>
                         </div>
                     </article>
                 `).join('')}
             </div>
-        </section>`;
+        </section>
+    `;
 }
 
 function renderPublicationDetail(pub) {
@@ -511,27 +582,80 @@ function renderPublicationDetail(pub) {
 function renderAdminPanel() {
     return `
         <div class="admin-panel">
-            <div class="admin-header"><div class="admin-header-inner"><h1>Panel Admin</h1><button class="btn btn-secondary" onclick="navigateHome()">Sitio</button></div></div>
+            <div class="admin-header">
+                <div class="admin-header-inner">
+                    <h1>Panel Admin</h1>
+                    <button class="btn btn-secondary" onclick="navigateHome()">Sitio</button>
+                </div>
+            </div>
+
             <nav class="admin-nav">
                 <button class="admin-nav-btn ${adminTab === 'publications' ? 'active' : ''}" onclick="setAdminTab('publications')">Posts</button>
                 <button class="admin-nav-btn ${adminTab === 'site' ? 'active' : ''}" onclick="setAdminTab('site')">Config</button>
             </nav>
+
             <div class="admin-content">
                 ${adminTab === 'publications' ? `
                     <button class="btn btn-primary mb-4" onclick="showPublicationModal()">Nuevo Post</button>
                     <table class="admin-table">
-                        ${publications.map(p => `<tr><td>${p.title}</td><td><button onclick="showPublicationModal(publications.find(x=>x.id==='${p.id}'))">${icon('edit')}</button><button onclick="deletePublication('${p.id}')">${icon('trash')}</button></td></tr>`).join('')}
+                        ${publications.map(p => `
+                            <tr>
+                                <td>${escapeHtml(p.title)}</td>
+                                <td>
+                                    <button onclick="showPublicationModal(publications.find(x => x.id === '${p.id}'))">
+                                        ${icon('edit')}
+                                    </button>
+                                    <button onclick="deletePublication('${p.id}')">
+                                        ${icon('trash')}
+                                    </button>
+                                </td>
+                            </tr>
+                        `).join('')}
                     </table>
                 ` : `
-                    <form onsubmit="event.preventDefault(); saveSiteConfig({name: this.name.value, heroTitle: this.heroTitle.value, heroSubtitle: this.heroSubtitle.value, footerText: this.footerText.value}).then(()=>showToast('Guardado','success'))">
-                        <div class="form-group"><label>Nombre</label><input name="name" class="form-input" value="${siteConfig.name}"></div>
-                        <div class="form-group"><label>Título</label><input name="heroTitle" class="form-input" value="${siteConfig.heroTitle}"></div>
-                        <div class="form-group"><label>Subtítulo</label><textarea name="heroSubtitle" class="form-input">${siteConfig.heroSubtitle}</textarea></div>
+                    <form onsubmit="event.preventDefault();
+                        saveSiteConfig({
+                            name: this.name.value,
+                            heroTitle: this.heroTitle.value,
+                            heroSubtitle: this.heroSubtitle.value,
+                            footerText: this.footerText.value,
+                            categories: this.categories.value
+                        }).then(() => {
+                            showToast('Guardado','success');
+                            renderApp();
+                        });
+                    ">
+                        <div class="form-group">
+                            <label>Nombre</label>
+                            <input name="name" class="form-input" value="${escapeHtml(siteConfig.name)}">
+                        </div>
+
+                        <div class="form-group">
+                            <label>Título</label>
+                            <input name="heroTitle" class="form-input" value="${escapeHtml(siteConfig.heroTitle)}">
+                        </div>
+
+                        <div class="form-group">
+                            <label>Subtítulo</label>
+                            <textarea name="heroSubtitle" class="form-input">${escapeHtml(siteConfig.heroSubtitle)}</textarea>
+                        </div>
+
+                        <div class="form-group">
+                            <label>Texto footer</label>
+                            <textarea name="footerText" class="form-input">${escapeHtml(siteConfig.footerText)}</textarea>
+                        </div>
+
+                        <div class="form-group">
+                            <label>Categorías (separadas por coma)</label>
+                            <input name="categories" class="form-input" value="${escapeHtml(siteConfig.categories || '')}" placeholder="Reflexiones, Poesía, Ensayos">
+                        </div>
+
                         <button type="submit" class="btn btn-primary">Guardar</button>
                     </form>
                 `}
             </div>
-        </div>`;
+        </div>
+    `;
 }
 
 function renderApp() {
