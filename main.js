@@ -24,6 +24,7 @@ let siteConfig = {
 
 let publications = [];
 let newsletterEmails = [];
+let newsletterSubscribers = [];
 
 // ============================================
 // ICONOS SVG
@@ -179,7 +180,7 @@ async function signOut() {
 }
 
 // ============================================
-// GESTIÓN DE PUBLICACIONES (CORREGIDO)
+// GESTIÓN DE PUBLICACIONES
 // ============================================
 async function loadPublications() {
     if (!supabaseClient) return;
@@ -192,7 +193,7 @@ async function loadPublications() {
         if (data) {
             publications = data.map(pub => ({
                 ...pub,
-                readTime: pub.read_time // Mapeo para el código
+                readTime: pub.read_time
             }));
         }
     } catch (error) { console.error('Error cargando posts:', error); }
@@ -209,7 +210,7 @@ async function savePublication(pub) {
         author: pub.author,
         image: pub.image,
         date: pub.date || formatDate(new Date()),
-        read_time: pub.readTime, // Mapeo para DB
+        read_time: pub.readTime,
         updated_at: new Date().toISOString()
     };
     
@@ -233,14 +234,13 @@ async function deletePublication(id) {
 }
 
 // ============================================
-// CONFIGURACIÓN DEL SITIO (CORREGIDO)
+// CONFIGURACIÓN DEL SITIO
 // ============================================
 async function loadSiteConfig() {
     if (!supabaseClient) return;
     try {
         const { data, error } = await supabaseClient.from('site_config').select('*').single();
         if (error) throw error;
-
         if (data) {
             siteConfig = {
                 name: data.name,
@@ -259,7 +259,6 @@ async function loadSiteConfig() {
 
 async function saveSiteConfig(config) {
     siteConfig = { ...siteConfig, ...config };
-
     try {
         const dataToSave = {
             id: 1,
@@ -271,21 +270,15 @@ async function saveSiteConfig(config) {
             footer_text: siteConfig.footerText,
             categories: siteConfig.categories
         };
-
-        const { data, error } = await supabaseClient
-            .from('site_config')
-            .upsert(dataToSave)
-            .select()
-            .single();
-
+        const { data, error } = await supabaseClient.from('site_config').upsert(dataToSave).select().single();
         if (error) throw error;
-
         return data;
     } catch (error) {
         showToast('Error: ' + error.message, 'error');
         throw error;
     }
 }
+
 // ============================================
 // NEWSLETTER
 // ============================================
@@ -293,12 +286,37 @@ async function subscribeNewsletter(email) {
     try {
         const { error } = await supabaseClient.from('newsletter').insert({ email });
         if (error) {
-            if (error.code === '23505') { showToast('Ya estás suscrito.', 'info'); return true; }
+            if (error.code === '23505') { showToast('Ya estás suscrito ✨', 'info'); return true; }
             throw error;
         }
-        showToast('¡Gracias por suscribirte!', 'success');
+        showToast('¡Gracias por suscribirte! 💌', 'success');
         return true;
     } catch (error) { showToast('Error en suscripción', 'error'); }
+}
+
+async function loadSubscribers() {
+    if (!supabaseClient || !isAdmin) return;
+    try {
+        const { data, error } = await supabaseClient.from('newsletter').select('*').order('created_at', { ascending: false });
+        if (error) throw error;
+        newsletterSubscribers = data || [];
+    } catch (error) {
+        console.error('Error cargando suscriptores:', error);
+        showToast('No se pudieron cargar suscriptores', 'error');
+    }
+}
+
+async function deleteSubscriber(id) {
+    if (!confirm('¿Eliminar este suscriptor?')) return;
+    try {
+        const { error } = await supabaseClient.from('newsletter').delete().eq('id', id);
+        if (error) throw error;
+        showToast('Suscriptor eliminado', 'success');
+        await loadSubscribers();
+        renderApp();
+    } catch (error) {
+        showToast('Error al eliminar', 'error');
+    }
 }
 
 function fileToBase64(file) {
@@ -321,23 +339,16 @@ function openModal(content) {
     overlay.id = 'modal-overlay';
     overlay.innerHTML = `<div class="modal">${content}</div>`;
     
-    // --- LÓGICA ANTI-CIERRE ACCIDENTAL ---
     let clickStartedOnOverlay = false;
-
     overlay.addEventListener('mousedown', (e) => {
-        // Registramos si el usuario apretó el botón sobre el fondo oscuro
         clickStartedOnOverlay = (e.target === overlay);
     });
-
     overlay.addEventListener('mouseup', (e) => {
-        // Solo cerramos si empezó en el fondo Y terminó en el fondo.
-        // Si el usuario empezó adentro (seleccionando texto) y soltó afuera, NO se cierra.
         if (e.target === overlay && clickStartedOnOverlay) {
             closeModal();
         }
         clickStartedOnOverlay = false;
     });
-    // ---------------------------------------
     
     document.body.appendChild(overlay);
     currentModal = overlay;
@@ -361,7 +372,7 @@ function showLoginModal() {
 
 function showNewsletterModal() {
     openModal(`
-        <div class="modal-header"><h2>Newsletter</h2><p>Si te dan ganas de leer más, dejá tu mail acá ✨</p></div>
+        <div class="modal-header"><h2>Newsletter</h2><p>Si te dan ganas de leer más, deja tu mail acá ✨✨✨</p></div>
         <form id="newsletter-form" class="modal-body">
             <div class="form-group"><input type="email" class="form-input" name="email" placeholder="tu@email.com" required></div>
             <button type="submit" class="btn btn-primary" style="width: 100%">${icon('mail')} Suscribirme</button>
@@ -378,65 +389,19 @@ function showPublicationModal(pub = null) {
     const isEdit = !!pub;
     const categoryList = getCategories();
     const defaultCategory = categoryList[0] || 'General';
-
-    const data = pub || {
-        title: '',
-        excerpt: '',
-        content: '',
-        category: defaultCategory,
-        author: '',
-        image: '',
-        readTime: '5 min'
-    };
+    const data = pub || { title: '', excerpt: '', content: '', category: defaultCategory, author: '', image: '', readTime: '5 min' };
 
     openModal(`
         <div class="modal-header"><h2>${isEdit ? 'Editar' : 'Nueva'} Publicación</h2></div>
         <form id="publication-form" class="modal-body">
-            <div class="form-group">
-                <label class="form-label">Título</label>
-                <input type="text" class="form-input" name="title" value="${escapeHtml(data.title)}" required>
-            </div>
-
-            <div class="form-group">
-                <label class="form-label">Categoría</label>
-                <select class="form-input" name="category">
-                    ${categoryList.map(cat => `
-                        <option value="${escapeHtml(cat)}" ${data.category === cat ? 'selected' : ''}>
-                            ${escapeHtml(cat)}
-                        </option>
-                    `).join('')}
-                </select>
-            </div>
-
-            <div class="form-group">
-                <label class="form-label">Autor</label>
-                <input type="text" class="form-input" name="author" value="${escapeHtml(data.author)}" required>
-            </div>
-
-            <div class="form-group">
-                <label class="form-label">Tiempo</label>
-                <input type="text" class="form-input" name="readTime" value="${escapeHtml(data.readTime)}">
-            </div>
-
-            <div class="form-group">
-                <label class="form-label">Extracto</label>
-                <textarea class="form-input" name="excerpt">${escapeHtml(data.excerpt)}</textarea>
-            </div>
-
-            <div class="form-group">
-                <label class="form-label">Contenido</label>
-                <textarea class="form-input" name="content" rows="6">${escapeHtml(data.content)}</textarea>
-            </div>
-
-            <div class="form-group">
-                <label class="form-label">Imagen</label>
-                <input type="file" id="pub-image-input" accept="image/*">
-                <input type="hidden" name="existingImage" value="${data.image}">
-            </div>
-
-            <button type="submit" class="btn btn-primary" style="width: 100%">
-                ${icon('save')} Guardar
-            </button>
+            <div class="form-group"><label class="form-label">Título</label><input type="text" class="form-input" name="title" value="${escapeHtml(data.title)}" required></div>
+            <div class="form-group"><label class="form-label">Categoría</label><select class="form-input" name="category">${categoryList.map(cat => `<option value="${escapeHtml(cat)}" ${data.category === cat ? 'selected' : ''}>${escapeHtml(cat)}</option>`).join('')}</select></div>
+            <div class="form-group"><label class="form-label">Autor</label><input type="text" class="form-input" name="author" value="${escapeHtml(data.author)}" required></div>
+            <div class="form-group"><label class="form-label">Tiempo</label><input type="text" class="form-input" name="readTime" value="${escapeHtml(data.readTime)}"></div>
+            <div class="form-group"><label class="form-label">Extracto</label><textarea class="form-input" name="excerpt">${escapeHtml(data.excerpt)}</textarea></div>
+            <div class="form-group"><label class="form-label">Contenido</label><textarea class="form-input" name="content" rows="6">${escapeHtml(data.content)}</textarea></div>
+            <div class="form-group"><label class="form-label">Imagen</label><input type="file" id="pub-image-input" accept="image/*"><input type="hidden" name="existingImage" value="${data.image}"></div>
+            <button type="submit" class="btn btn-primary" style="width: 100%">${icon('save')} Guardar</button>
         </form>
     `);
 
@@ -445,20 +410,8 @@ function showPublicationModal(pub = null) {
         const form = e.target;
         let imageData = form.existingImage.value;
         const file = $('#pub-image-input').files[0];
-
         if (file) imageData = await fileToBase64(file);
-
-        await savePublication({
-            id: pub?.id,
-            title: form.title.value,
-            excerpt: form.excerpt.value,
-            content: form.content.value,
-            category: form.category.value,
-            author: form.author.value,
-            readTime: form.readTime.value,
-            image: imageData
-        });
-
+        await savePublication({ id: pub?.id, title: form.title.value, excerpt: form.excerpt.value, content: form.content.value, category: form.category.value, author: form.author.value, readTime: form.readTime.value, image: imageData });
         showToast('Guardado', 'success');
         closeModal();
         renderApp();
@@ -466,7 +419,7 @@ function showPublicationModal(pub = null) {
 }
 
 // ============================================
-// VISTAS Y NAVEGACIÓN (Recuperando original)
+// VISTAS Y NAVEGACIÓN
 // ============================================
 let currentView = 'home';
 let selectedPublication = null;
@@ -523,20 +476,12 @@ function renderPublications() {
         const matchesSearch = pub.title.toLowerCase().includes(searchQuery.toLowerCase());
         return matchesCategory && matchesSearch;
     });
-
     const cats = ['Todos', ...getCategories()];
-
     return `
         <section class="publications-section" id="publications">
             <div class="category-filters">
-                ${cats.map(c => `
-                    <button class="category-btn ${selectedCategory === c ? 'active' : ''}"
-                        onclick="filterCategory('${escapeHtml(c)}')">
-                        ${escapeHtml(c)}
-                    </button>
-                `).join('')}
+                ${cats.map(c => `<button class="category-btn ${selectedCategory === c ? 'active' : ''}" onclick="filterCategory('${escapeHtml(c)}')">${escapeHtml(c)}</button>`).join('')}
             </div>
-
             <div class="publications-grid">
                 ${filtered.map(pub => `
                     <article class="publication-card" onclick="viewPublication('${pub.id}')">
@@ -544,11 +489,9 @@ function renderPublications() {
                             <img src="${pub.image || 'https://images.unsplash.com/photo-1481627834876-b7833e8f5570?w=800&q=80'}">
                             <span class="publication-category">${escapeHtml(pub.category)}</span>
                         </div>
-
                         <div class="publication-content">
                             <h3 class="publication-title">${escapeHtml(pub.title)}</h3>
                             <p class="publication-excerpt">${escapeHtml(pub.excerpt)}</p>
-
                             <div class="publication-meta" style="margin-top: 1rem; display: flex; justify-content: space-between; font-size: 0.8rem; color: var(--color-sage);">
                                 <span>${escapeHtml(pub.author)}</span>
                                 <span>${escapeHtml(pub.date)}</span>
@@ -588,12 +531,11 @@ function renderAdminPanel() {
                     <button class="btn btn-secondary" onclick="navigateHome()">Sitio</button>
                 </div>
             </div>
-
             <nav class="admin-nav">
                 <button class="admin-nav-btn ${adminTab === 'publications' ? 'active' : ''}" onclick="setAdminTab('publications')">Posts</button>
+                <button class="admin-nav-btn ${adminTab === 'subscribers' ? 'active' : ''}" onclick="setAdminTab('subscribers')">Suscriptores</button>
                 <button class="admin-nav-btn ${adminTab === 'site' ? 'active' : ''}" onclick="setAdminTab('site')">Config</button>
             </nav>
-
             <div class="admin-content">
                 ${adminTab === 'publications' ? `
                     <button class="btn btn-primary mb-4" onclick="showPublicationModal()">Nuevo Post</button>
@@ -602,54 +544,33 @@ function renderAdminPanel() {
                             <tr>
                                 <td>${escapeHtml(p.title)}</td>
                                 <td>
-                                    <button onclick="showPublicationModal(publications.find(x => x.id === '${p.id}'))">
-                                        ${icon('edit')}
-                                    </button>
-                                    <button onclick="deletePublication('${p.id}')">
-                                        ${icon('trash')}
-                                    </button>
+                                    <button onclick="showPublicationModal(publications.find(x => x.id === '${p.id}'))">${icon('edit')}</button>
+                                    <button onclick="deletePublication('${p.id}')">${icon('trash')}</button>
                                 </td>
                             </tr>
                         `).join('')}
                     </table>
+                ` : adminTab === 'subscribers' ? `
+                    <div style="margin-bottom:1rem"><h3>Total suscriptores: ${newsletterSubscribers.length}</h3></div>
+                    <table class="admin-table">
+                        <thead><tr><th>Email</th><th>Fecha</th><th style="width:60px"></th></tr></thead>
+                        <tbody>
+                            ${newsletterSubscribers.map(s => `
+                                <tr>
+                                    <td>${escapeHtml(s.email)}</td>
+                                    <td>${formatDate(s.created_at)}</td>
+                                    <td><button onclick="deleteSubscriber(${s.id})" title="Eliminar">${icon('trash')}</button></td>
+                                </tr>
+                            `).join('')}
+                        </tbody>
+                    </table>
                 ` : `
-                    <form onsubmit="event.preventDefault();
-                        saveSiteConfig({
-                            name: this.name.value,
-                            heroTitle: this.heroTitle.value,
-                            heroSubtitle: this.heroSubtitle.value,
-                            footerText: this.footerText.value,
-                            categories: this.categories.value
-                        }).then(() => {
-                            showToast('Guardado','success');
-                            renderApp();
-                        });
-                    ">
-                        <div class="form-group">
-                            <label>Nombre</label>
-                            <input name="name" class="form-input" value="${escapeHtml(siteConfig.name)}">
-                        </div>
-
-                        <div class="form-group">
-                            <label>Título</label>
-                            <input name="heroTitle" class="form-input" value="${escapeHtml(siteConfig.heroTitle)}">
-                        </div>
-
-                        <div class="form-group">
-                            <label>Subtítulo</label>
-                            <textarea name="heroSubtitle" class="form-input">${escapeHtml(siteConfig.heroSubtitle)}</textarea>
-                        </div>
-
-                        <div class="form-group">
-                            <label>Texto footer</label>
-                            <textarea name="footerText" class="form-input">${escapeHtml(siteConfig.footerText)}</textarea>
-                        </div>
-
-                        <div class="form-group">
-                            <label>Categorías (separadas por coma)</label>
-                            <input name="categories" class="form-input" value="${escapeHtml(siteConfig.categories || '')}" placeholder="Reflexiones, Poesía, Ensayos">
-                        </div>
-
+                    <form onsubmit="event.preventDefault(); saveSiteConfig({ name: this.name.value, heroTitle: this.heroTitle.value, heroSubtitle: this.heroSubtitle.value, footerText: this.footerText.value, categories: this.categories.value }).then(() => { showToast('Guardado','success'); renderApp(); });">
+                        <div class="form-group"><label>Nombre</label><input name="name" class="form-input" value="${escapeHtml(siteConfig.name)}"></div>
+                        <div class="form-group"><label>Título</label><input name="heroTitle" class="form-input" value="${escapeHtml(siteConfig.heroTitle)}"></div>
+                        <div class="form-group"><label>Subtítulo</label><textarea name="heroSubtitle" class="form-input">${escapeHtml(siteConfig.heroSubtitle)}</textarea></div>
+                        <div class="form-group"><label>Texto footer</label><textarea name="footerText" class="form-input">${escapeHtml(siteConfig.footerText)}</textarea></div>
+                        <div class="form-group"><label>Categorías (separadas por coma)</label><input name="categories" class="form-input" value="${escapeHtml(siteConfig.categories || '')}" placeholder="Reflexiones, Poesía, Ensayos"></div>
                         <button type="submit" class="btn btn-primary">Guardar</button>
                     </form>
                 `}
@@ -670,8 +591,9 @@ window.navigateHome = () => { currentView = 'home'; selectedPublication = null; 
 window.navigateAdmin = () => { currentView = 'admin'; renderApp(); };
 window.viewPublication = (id) => { selectedPublication = publications.find(p => p.id === id); currentView = 'publication'; renderApp(); window.scrollTo(0,0); };
 window.filterCategory = (cat) => { selectedCategory = cat; renderApp(); };
-window.setAdminTab = (tab) => { adminTab = tab; renderApp(); };
+window.setAdminTab = async (tab) => { adminTab = tab; if(tab === 'subscribers'){ showLoading(true); await loadSubscribers(); showLoading(false); } renderApp(); };
 window.handleSearch = (e) => { searchQuery = e.target.value; renderApp(); };
+window.deleteSubscriber = deleteSubscriber;
 
 async function init() {
     showLoading(true);
