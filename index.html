@@ -530,10 +530,16 @@
         }
         .modal-overlay.open { opacity: 1; visibility: visible; }
         .modal {
-            background-color: var(--color-cream); border-radius: var(--radius);
-            max-width: 500px; width: 100%; max-height: 90vh; overflow-y: auto;
-            transform: scale(0.9); transition: transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+            background-color: var(--color-cream); 
+            border-radius: var(--radius);
+            max-width: 600px; /* 👈 Lo subimos de 500px a 600px para que el texto no esté tan apretado */
+            width: 95%;       /* 👈 Asegura que en móviles se vea bien */
+            max-height: 90vh; 
+            overflow-y: auto;
+            transform: scale(0.9); 
+            transition: transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
             box-shadow: 0 20px 50px rgba(0,0,0,0.2);
+            position: relative; /* 👈 Añadimos esto por seguridad */
         }
         .modal-overlay.open .modal { transform: scale(1); }
         .modal-header { padding: 2rem; border-bottom: 1px solid var(--color-beige); text-align: center; }
