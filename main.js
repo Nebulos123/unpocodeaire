@@ -361,7 +361,7 @@ function showLoginModal() {
 
 function showNewsletterModal() {
     openModal(`
-        <div class="modal-header"><h2>Newsletter</h2><p>Recibe lo mejor en tu correo</p></div>
+        <div class="modal-header"><h2>Newsletter</h2><p>Si te dan ganas de leer más, dejá tu mail acá ✨</p></div>
         <form id="newsletter-form" class="modal-body">
             <div class="form-group"><input type="email" class="form-input" name="email" placeholder="tu@email.com" required></div>
             <button type="submit" class="btn btn-primary" style="width: 100%">${icon('mail')} Suscribirme</button>
